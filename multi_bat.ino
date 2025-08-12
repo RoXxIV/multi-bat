@@ -16,7 +16,7 @@ ButtonManager buttons;
 void setup()
 {
   Serial.begin(115200);
-  initializeConfig();
+  Serial.println("=== MULTI-BATTERIE v2.2 ===");
   printSystemInfo();
 
   displayMgr.begin();
@@ -24,6 +24,8 @@ void setup()
   buttons.setDebounceDelay(DEBOUNCE_DELAY);
 
   menuMgr.begin();
+
+  Serial.println("Système prêt !");
 }
 
 void loop()

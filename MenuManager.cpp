@@ -12,15 +12,9 @@ MenuManager::MenuManager(DisplayManager *displayMgr)
 
 void MenuManager::begin()
 {
-    buildMenuItems(); // construit le menu de base
+    buildMenuItems();
     resetCodeInput();
     viewTop = 0;
-    if (totalMenuItems > VISIBLE_COUNT)
-    {
-        // optionnel: démarre sur 0..3 (classique)
-        // si tu veux démarrer sur 1..4, mets viewTop = 1;
-    }
-    Serial.printf("MenuManager prêt - %d items\n", totalMenuItems);
     Serial.printf("MenuManager prêt - %d items\n", totalMenuItems);
 }
 
@@ -29,47 +23,39 @@ void MenuManager::buildMenuItems()
     totalMenuItems = 0;
 
     // Items de base
-    for (int i = 0; i < MENU_BASE_COUNT && totalMenuItems < MAX_MENU_ITEMS; i++)
-    {
-        menuItems[totalMenuItems] = {BASE_MENU_ITEMS[i], true, false};
-        totalMenuItems++;
-    }
+    menuItems[totalMenuItems++] = {"Afficher ID batteries", ACTION_DISPLAY_IDS, false};
+    menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, false};
+    menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
+    menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, false};
+    menuItems[totalMenuItems++] = {"Mode admin", ACTION_ADMIN_CODE, false};
 
     // Items admin si authentifié
     if (adminAuthenticated)
     {
-        for (int i = 0; i < MENU_ADMIN_COUNT && totalMenuItems < MAX_MENU_ITEMS; i++)
-        {
-            menuItems[totalMenuItems] = {ADMIN_MENU_ITEMS[i], true, true};
-            totalMenuItems++;
-        }
+        menuItems[totalMenuItems++] = {"Parametres systeme", ACTION_SYSTEM_SETTINGS, true};
     }
 
+    // Garde-fou
     if (totalMenuItems == 0)
     {
-        // garde-fou : jamais 0
-        menuItems[0] = {"Aucun item", false, false};
+        menuItems[0] = {"Aucun item", ACTION_DISPLAY_IDS, false};
         totalMenuItems = 1;
     }
 
+    // Ajustements après reconstruction
     if (selectedMenuItem >= totalMenuItems)
     {
         selectedMenuItem = totalMenuItems - 1;
     }
-    int maxTop = (totalMenuItems > VISIBLE_COUNT) ? (totalMenuItems - VISIBLE_COUNT) : 0;
-    if (viewTop > maxTop)
-        viewTop = maxTop;
-    if (viewTop < 0)
-        viewTop = 0;
+    adjustView();
 }
 
 void MenuManager::navigateUp()
 {
     if (currentState == SCREEN_MAIN_MENU)
     {
-        int before = selectedMenuItem;
         selectedMenuItem = (selectedMenuItem - 1 + totalMenuItems) % totalMenuItems;
-        adjustViewAfterMove(-1);
+        adjustView();
         Serial.printf("UP -> %d: %s\n", selectedMenuItem, menuItems[selectedMenuItem].text);
     }
     else if (currentState == SCREEN_CODE_INPUT)
@@ -82,9 +68,8 @@ void MenuManager::navigateDown()
 {
     if (currentState == SCREEN_MAIN_MENU)
     {
-        int before = selectedMenuItem;
         selectedMenuItem = (selectedMenuItem + 1) % totalMenuItems;
-        adjustViewAfterMove(+1);
+        adjustView();
         Serial.printf("DOWN -> %d: %s\n", selectedMenuItem, menuItems[selectedMenuItem].text);
     }
     else if (currentState == SCREEN_CODE_INPUT)
@@ -143,45 +128,30 @@ void MenuManager::executeMenuAction(int idx)
 {
     if (idx < 0 || idx >= totalMenuItems)
         return;
-    const char *t = menuItems[idx].text;
-    Serial.printf("Action: %s\n", t);
 
-    // ——— Ouverture de la saisie de code
-    if (strcmp(t, "Mode admin") == 0)
+    Serial.printf("Action: %s\n", menuItems[idx].text);
+
+    switch (menuItems[idx].action)
     {
-        actionAdminCode();
+    case ACTION_ADMIN_CODE:
         currentState = SCREEN_CODE_INPUT;
         resetCodeInput();
-        return;
-    }
-
-    // ——— Items admin (apparaissent seulement si adminAuthenticated == true)
-    if (strcmp(t, "Parametres systeme") == 0)
-    {
-        actionSystemSettings();
-        return;
-    }
-
-    // ——— Items de base
-    if (strcmp(t, "Afficher ID batteries") == 0)
-    {
+        break;
+    case ACTION_DISPLAY_IDS:
         actionDisplayIds();
-        return;
-    }
-    if (strcmp(t, "Effectuer appairage") == 0)
-    {
+        break;
+    case ACTION_PAIRING:
         actionPairing();
-        return;
-    }
-    if (strcmp(t, "Affichage erreurs") == 0)
-    {
+        break;
+    case ACTION_ERRORS:
         actionErrors();
-        return;
-    }
-    if (strcmp(t, "Batteries individuelles") == 0)
-    {
+        break;
+    case ACTION_INDIVIDUAL:
         actionIndividual();
-        return;
+        break;
+    case ACTION_SYSTEM_SETTINGS:
+        actionSystemSettings();
+        break;
     }
 }
 
@@ -201,37 +171,35 @@ void MenuManager::updateDisplay()
     }
 }
 
-// ——— Rendu
-
 void MenuManager::displayMainMenu()
 {
-    DisplayLine lines[MAX_MENU_ITEMS + 2];
-    int n = 0;
+    display->clear();
 
-    lines[n++] = {12, adminAuthenticated ? "=== MENU (ADMIN) ===" : "=== MENU PRINCIPAL ===",
-                  FONT_MEDIUM, false, 5};
+    // Titre
+    const char *title = adminAuthenticated ? "=== MENU (ADMIN) ===" : "=== MENU PRINCIPAL ===";
+    display->drawTitle(title);
 
-    // on affiche au plus 4 éléments, en partant de viewTop
+    // Items visibles
     int visible = min(VISIBLE_COUNT, totalMenuItems);
     for (int j = 0; j < visible; ++j)
     {
-        int idx = viewTop + j; // pas de modulo: on garde une fenêtre linéaire
+        int idx = viewTop + j;
         int y = 25 + j * 10;
         bool sel = (idx == selectedMenuItem);
-        lines[n++] = {y, menuItems[idx].text, FONT_MEDIUM, sel, 10};
+        display->drawText(10, y, menuItems[idx].text, false, sel);
     }
 
-    display->drawScreen(lines, n);
-
-    // Curseur aligné sur la position relative
-    int rel = selectedMenuItem - viewTop; // 0..visible-1
+    // Curseur
+    int rel = selectedMenuItem - viewTop;
     if (rel >= 0 && rel < visible)
     {
         display->drawMenuCursor(25 + rel * 10);
     }
+
+    display->show();
 }
 
-void MenuManager::adjustViewAfterMove(int dir)
+void MenuManager::adjustView()
 {
     if (totalMenuItems <= VISIBLE_COUNT)
     {
@@ -239,48 +207,16 @@ void MenuManager::adjustViewAfterMove(int dir)
         return;
     }
 
-    int maxTop = totalMenuItems - VISIBLE_COUNT;
-
-    if (dir > 0)
-    { // DOWN
-        // Cas wrap: dernier -> 0
-        if (selectedMenuItem == 0)
-        {
-            viewTop = 0; // <-- clé: on remonte la fenêtre pour montrer l'index 0
-            return;
-        }
-        // Si la sélection dépasse le bas de la fenêtre, on pousse
-        int bottom = viewTop + VISIBLE_COUNT - 1;
-        if (selectedMenuItem > bottom)
-        {
-            viewTop = selectedMenuItem - (VISIBLE_COUNT - 1);
-            if (viewTop > maxTop)
-                viewTop = maxTop;
-        }
-    }
-    else
-    { // dir < 0, UP
-        // Cas wrap: 0 -> dernier
-        if (selectedMenuItem == totalMenuItems - 1)
-        {
-            viewTop = maxTop; // affiche les 4 derniers
-            return;
-        }
-        // Si la sélection remonte au-dessus de la fenêtre, on remonte
-        if (selectedMenuItem < viewTop)
-        {
-            viewTop = selectedMenuItem;
-            if (viewTop < 0)
-                viewTop = 0;
-        }
-    }
+    // Centre la sélection dans la fenêtre visible
+    viewTop = selectedMenuItem - (VISIBLE_COUNT / 2);
+    viewTop = max(0, min(viewTop, totalMenuItems - VISIBLE_COUNT));
 }
 
 void MenuManager::displayCodeInput()
 {
     display->clear();
-    display->drawTitle(MSG_CODE_TITLE);
-    display->drawText(15, 25, MSG_CODE_PROMPT, FONT_MEDIUM);
+    display->drawTitle("CODE ADMIN");
+    display->drawText(15, 25, "Entrez code (3 chiffres)");
 
     for (int i = 0; i < 3; ++i)
     {
@@ -292,11 +228,9 @@ void MenuManager::displayCodeInput()
         }
         char buf[2];
         sprintf(buf, "%d", codeDigits[i]);
-        display->drawText(x, y, buf, FONT_LARGE);
+        display->drawText(x, y, buf, true); // large font
     }
 
-    // On retire l’instruction en bas d’écran
-    // display->drawInstructions("UP/DN:Chiffre  OK:Suivant  BACK:Retour");
     display->show();
 }
 
@@ -304,22 +238,20 @@ void MenuManager::displayCodeResult()
 {
     if (codeSuccess)
     {
-        display->showMessage(MSG_CODE_SUCCESS, MSG_ADMIN_ACTIVATED, 0);
+        display->showMessage("CODE VALIDE", "Mode Admin Active");
     }
     else
     {
-        display->showMessage(MSG_CODE_ERROR, "Acces refuse", 0);
+        display->showMessage("CODE INCORRECT", "Acces refuse");
     }
 
     if (millis() - resultTimer > MESSAGE_TIMEOUT)
     {
         if (codeSuccess)
-            activateAdmin();             // ← ajoute les items admin
-        currentState = SCREEN_MAIN_MENU; // retour menu
+            activateAdmin();
+        currentState = SCREEN_MAIN_MENU;
     }
 }
-
-// ——— Code admin
 
 void MenuManager::resetCodeInput()
 {
@@ -341,14 +273,12 @@ void MenuManager::checkCode()
     resultTimer = millis();
 }
 
-// ——— Admin on/off
-
 void MenuManager::activateAdmin()
 {
     if (!adminAuthenticated)
     {
         adminAuthenticated = true;
-        buildMenuItems(); // reconstruit le menu avec ADMIN_MENU_ITEMS
+        buildMenuItems();
         Serial.println("Admin activé (menu étendu)");
     }
 }
@@ -363,11 +293,9 @@ void MenuManager::deactivateAdmin()
     }
 }
 
-// ——— Stubs d’actions
-
-void MenuManager::actionAdminCode() { Serial.println("Action: Saisie code admin"); }
-void MenuManager::actionSystemSettings() { Serial.println("Action: Parametres systeme"); }
+// ——— Stubs d'actions
 void MenuManager::actionDisplayIds() { Serial.println("Action: Afficher ID batteries"); }
 void MenuManager::actionPairing() { Serial.println("Action: Effectuer appairage"); }
 void MenuManager::actionErrors() { Serial.println("Action: Affichage erreurs"); }
 void MenuManager::actionIndividual() { Serial.println("Action: Batteries individuelles"); }
+void MenuManager::actionSystemSettings() { Serial.println("Action: Parametres systeme"); }

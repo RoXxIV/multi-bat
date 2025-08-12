@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <Arduino.h>
+
 // ——————— CONFIGURATION HARDWARE ———————
 // Pins OLED I2C
 #define OLED_SDA_PIN 21
@@ -22,32 +24,14 @@
 // Timing
 #define DEBOUNCE_DELAY 50    // ms
 #define MESSAGE_TIMEOUT 2000 // ms
-#define SCREEN_TIMEOUT 60000 // ms (extinction écran après 1 minute)
 
 // Limites
 #define MAX_MENU_ITEMS 10
-#define MAX_ADMIN_ITEMS 5
 
-// ——————— TEXTES DES MENUS ———————
-// Menu principal de base (sans admin)
-#define MENU_BASE_COUNT 5
-extern const char *BASE_MENU_ITEMS[MENU_BASE_COUNT];
-
-// Items admin supplémentaires
-#define MENU_ADMIN_COUNT 1
-extern const char *ADMIN_MENU_ITEMS[MENU_ADMIN_COUNT];
-
-// Messages système
-extern const char *MSG_STARTUP_TITLE;
-extern const char *MSG_STARTUP_TEXT;
-extern const char *MSG_CODE_TITLE;
-extern const char *MSG_CODE_PROMPT;
-extern const char *MSG_CODE_SUCCESS;
-extern const char *MSG_CODE_ERROR;
-extern const char *MSG_ADMIN_ACTIVATED;
-
-// ——————— FONCTIONS D'INITIALISATION ———————
-void initializeConfig();
-void printSystemInfo();
+// ——————— FONCTIONS UTILITAIRES ———————
+inline void printSystemInfo()
+{
+    Serial.printf("Multi-Batterie v1.0 - RAM: %d bytes\n", ESP.getFreeHeap());
+}
 
 #endif

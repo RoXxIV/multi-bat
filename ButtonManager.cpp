@@ -3,7 +3,7 @@
 // ——————— MÉTHODES ButtonState ———————
 bool ButtonState::pressed()
 {
-    return currentState && !previousState; // front montant logique d'appui
+    return currentState && !previousState; // logique d'appui
 }
 
 // ——————— MÉTHODES ButtonManager ———————
@@ -29,7 +29,7 @@ void ButtonManager::begin(int upPin, int downPin, int okPin, int backPin)
     buttons[BTN_TYPE_OK].pin = okPin;
     buttons[BTN_TYPE_BACK].pin = backPin;
 
-    // Configuration des pins (même logique que l’alpha : lecture directe, pas de pullup ici)
+    // Configuration des pins
     for (int i = 0; i < BTN_COUNT; i++)
     {
         if (buttons[i].pin != -1)
@@ -44,11 +44,8 @@ void ButtonManager::begin(int upPin, int downPin, int okPin, int backPin)
         }
     }
 
-    Serial.println("ButtonManager initialisé (alpha-like):");
-    Serial.printf("  UP:   pin %d\n", upPin);
-    Serial.printf("  DOWN: pin %d\n", downPin);
-    Serial.printf("  OK:   pin %d\n", okPin);
-    Serial.printf("  BACK: pin %d\n", backPin);
+    Serial.println("ButtonManager initialisé:");
+    Serial.printf("  UP:%d DOWN:%d OK:%d BACK:%d\n", upPin, downPin, okPin, backPin);
 }
 
 void ButtonManager::update()
@@ -66,25 +63,17 @@ void ButtonManager::updateButton(ButtonType buttonType)
         return;
 
     unsigned long now = millis();
-    bool raw = digitalRead(btn.pin); // alpha = lecture directe (HIGH = appui)
+    bool raw = digitalRead(btn.pin); // lecture directe (HIGH = appui)
 
-    // EXACTEMENT comme l’alpha : on fige l’état précédent AVANT le filtrage
+    // EXACTEMENT comme l'alpha : on fige l'état précédent AVANT le filtrage
     btn.previousState = btn.currentState;
 
-    // Débounce "naïf" de l’alpha :
-    // - si la fenêtre est dépassée, on prend la lecture brute
-    // - si la lecture est HAUTE (appui), on relance la fenêtre
     if (now - btn.lastDebounce > debounceDelay)
     {
         btn.currentState = raw;
         if (raw)
             btn.lastDebounce = now;
     }
-
-    // Log optionnel (décommente si tu veux voir les fronts)
-    // if (btn.pressed()) {
-    //     Serial.printf("Bouton %s appuyé\n", getButtonName(buttonType));
-    // }
 }
 
 bool ButtonManager::anyPressed()
@@ -108,6 +97,7 @@ void ButtonManager::resetAll()
     Serial.println("Tous les boutons ont été réinitialisés");
 }
 
+// DEBUG
 void ButtonManager::printStates()
 {
     Serial.print("États boutons: ");

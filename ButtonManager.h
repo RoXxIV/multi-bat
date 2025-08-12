@@ -13,14 +13,13 @@ enum ButtonType
     BTN_COUNT
 };
 
-// Structure simplifiée pour l'état d'un bouton
+// Structure pour l'état d'un bouton
 struct ButtonState
 {
     int pin;                    // Pin du bouton
     bool currentState;          // État actuel (HIGH/LOW)
     bool previousState;         // État précédent
     unsigned long lastDebounce; // Timestamp du dernier changement
-    bool lastRaw;               // Etat brut du dernier changement
 
     // Méthode unique : appui simple
     bool pressed(); // Front montant (appui unique)
@@ -30,8 +29,6 @@ class ButtonManager
 {
 private:
     ButtonState buttons[BTN_COUNT];
-
-    // Configuration
     unsigned long debounceDelay;
 
     // Méthodes privées

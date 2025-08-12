@@ -5,24 +5,6 @@
 #include <U8g2lib.h>
 #include "Config.h"
 
-// Petites tailles de police "symboliques"
-enum FontSize
-{
-    FONT_SMALL,
-    FONT_MEDIUM,
-    FONT_LARGE
-};
-
-// Ligne à dessiner via drawScreen
-struct DisplayLine
-{
-    int y;
-    const char *text;
-    FontSize size;
-    bool inverted; // surbrillance sélection
-    int xOffset;   // marge gauche
-};
-
 class DisplayManager
 {
 public:
@@ -31,80 +13,56 @@ public:
     void begin()
     {
         u8g2->begin();
-        u8g2->clearBuffer();
         u8g2->setFont(u8g2_font_6x10_tf);
-        u8g2->sendBuffer();
+        clear();
+        show();
     }
 
     void clear() { u8g2->clearBuffer(); }
     void show() { u8g2->sendBuffer(); }
 
+    // Méthode de texte unifiée avec paramètres optionnels
+    void drawText(int x, int y, const char *txt, bool large = false, bool inverted = false)
+    {
+        u8g2->setFont(large ? u8g2_font_logisoso16_tf : u8g2_font_6x10_tf);
+
+        if (inverted)
+        {
+            int textWidth = strlen(txt) * (large ? 12 : 6);
+            int textHeight = large ? 16 : 10;
+            u8g2->setDrawColor(1);
+            u8g2->drawBox(x - 2, y - textHeight + 2, textWidth + 4, textHeight);
+            u8g2->setDrawColor(0);
+            u8g2->drawStr(x, y, txt);
+            u8g2->setDrawColor(1);
+        }
+        else
+        {
+            u8g2->drawStr(x, y, txt);
+        }
+    }
+
     void drawTitle(const char *title)
     {
-        u8g2->setFont(u8g2_font_6x10_tf);
-        u8g2->drawStr(5, 12, title);
+        drawText(5, 12, title);
         u8g2->drawLine(0, 14, 127, 14);
     }
 
-    void drawText(int x, int y, const char *txt, FontSize size)
+    void drawFrame(int x, int y, int w, int h)
     {
-        switch (size)
-        {
-        case FONT_SMALL:
-            u8g2->setFont(u8g2_font_5x8_tf);
-            break;
-        case FONT_MEDIUM:
-            u8g2->setFont(u8g2_font_6x10_tf);
-            break;
-        case FONT_LARGE:
-            u8g2->setFont(u8g2_font_logisoso16_tf);
-            break;
-        }
-        u8g2->drawStr(x, y, txt);
-    }
-
-    void drawFrame(int x, int y, int w, int h) { u8g2->drawFrame(x, y, w, h); }
-
-    void drawInstructions(const char *txt)
-    {
-        u8g2->setFont(u8g2_font_5x8_tf);
-        u8g2->drawStr(0, 63, txt);
+        u8g2->drawFrame(x, y, w, h);
     }
 
     void drawMenuCursor(int y)
     {
-        // petite flèche à gauche de la ligne sélectionnée
-        u8g2->drawStr(0, y, ">");
+        drawText(0, y, ">");
     }
 
-    void drawScreen(const DisplayLine *lines, int count)
-    {
-        clear();
-        for (int i = 0; i < count; i++)
-        {
-            const DisplayLine &L = lines[i];
-            // inversion simple: on dessine un fond noir derrière le texte
-            if (L.inverted)
-            {
-                u8g2->setDrawColor(1);
-                u8g2->drawBox(0, L.y - 8, 128, 10);
-                u8g2->setDrawColor(0);
-                drawText(L.xOffset, L.y, L.text, L.size);
-                u8g2->setDrawColor(1);
-            }
-            else
-            {
-                drawText(L.xOffset, L.y, L.text, L.size);
-            }
-        }
-        show();
-    }
-
-    void showMessage(const char *title, const char *message, uint16_t /*ms*/)
+    void showMessage(const char *title, const char *message)
     {
         clear();
         drawTitle(title);
-        drawText(5, 32, message, FONT_MEDIUM);
+        drawText(5, 32, message);
         show();
     }
 

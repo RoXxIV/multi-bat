@@ -2,7 +2,6 @@
 #define MENU_MANAGER_H
 
 #include <Arduino.h>
-#include <string.h>
 #include "DisplayManager.h"
 #include "Config.h"
 
@@ -14,11 +13,22 @@ enum ScreenState
     SCREEN_CODE_RESULT
 };
 
-// Élément de menu (base ou admin)
+// Actions des items de menu
+enum MenuAction
+{
+    ACTION_DISPLAY_IDS,
+    ACTION_PAIRING,
+    ACTION_ERRORS,
+    ACTION_INDIVIDUAL,
+    ACTION_ADMIN_CODE,
+    ACTION_SYSTEM_SETTINGS
+};
+
+// Élément de menu simplifié
 struct MenuItem
 {
     const char *text;
-    bool enabled;
+    MenuAction action;
     bool isAdminItem;
 };
 
@@ -35,7 +45,7 @@ public:
     void selectCurrentItem();
     void goBack();
 
-    // Rafraîchit l’affichage selon l’état courant
+    // Rafraîchit l'affichage selon l'état courant
     void updateDisplay();
 
     // Getters
@@ -52,8 +62,6 @@ public:
     static void actionPairing();
     static void actionErrors();
     static void actionIndividual();
-    static void actionAdminCode();
-    static void actionAdminStuff();
     static void actionSystemSettings();
 
 private:
@@ -86,15 +94,15 @@ private:
     void resetCodeInput();
     void checkCode();
 
-    // Exécution d’un item (routing simple par texte)
+    // Exécution d'un item
     void executeMenuAction(int itemIndex);
 
     // Fenêtre de défilement
     static const int VISIBLE_COUNT = 4;
-    int viewTop = 0; // index du premier item affiché (0-based)
+    int viewTop = 0;
 
-    // Maintient la sélection dans la fenêtre visible (dir = +1 down, -1 up)
-    void adjustViewAfterMove(int dir);
+    // Navigation simplifiée
+    void adjustView();
 };
 
 #endif
