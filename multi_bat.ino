@@ -18,28 +18,24 @@ ModbusManager modbus(&MODBUS_SERIAL);
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("=== MULTI-BATTERIE v2.3 (Modbus Test) ===");
+  Serial.println("=== MULTI-BATTERIE v2.2 ===");
   printSystemInfo();
 
-  // Initialisation des composants
   displayMgr.begin();
   buttons.begin(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
   buttons.setDebounceDelay(DEBOUNCE_DELAY);
 
-  // NOUVEAU : Initialisation Modbus
   modbus.begin();
 
   menuMgr.begin();
 
-  Serial.println("Système prêt avec Modbus !");
-  Serial.println("RX:" + String(MODBUS_RX_PIN) + " TX:" + String(MODBUS_TX_PIN));
+  Serial.println("Système prêt !");
 }
 
 void loop()
 {
   buttons.update();
 
-  // Navigation menu classique
   if (buttons.isUpPressed())
     menuMgr.navigateUp();
   if (buttons.isDownPressed())
@@ -54,24 +50,22 @@ void loop()
 
 void handleOkButton()
 {
-  // Si on est dans le menu admin et qu'on sélectionne "Effectuer appairage"
+  // Si on est en mode admin et qu'on sélectionne l'appairage
   if (menuMgr.getCurrentState() == SCREEN_MAIN_MENU &&
       menuMgr.isAdminAuthenticated())
   {
 
-    // Ici on devrait identifier quelle action est sélectionnée
-    // Pour l'instant, on teste juste la commande H=7
-    Serial.println("Test: Envoi commande H=7");
-    modbus.sendDisplayIdCommand();
+    Serial.println("=== DÉBUT TEST H=7 TOUTES BATTERIES ===");
+    modbus.sendDisplayIdToAllBatteries();
   }
 
   // Action normale du menu
   menuMgr.selectCurrentItem();
 }
 
-// Fonction de test rapide (appeler depuis Serial Monitor si besoin)
+// Fonction de test rapide (si besoin depuis Serial Monitor)
 void testModbusNow()
 {
   Serial.println("=== TEST MANUEL MODBUS ===");
-  modbus.sendDisplayIdCommand();
+  modbus.sendDisplayIdToAllBatteries();
 }

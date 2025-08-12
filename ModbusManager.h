@@ -42,6 +42,12 @@ public:
     // Commande simple : afficher l'ID sur toutes les batteries
     bool sendDisplayIdCommand();
 
+    // NOUVEAU : Envoyer H=7 à toutes les batteries (ID 1-9)
+    bool sendDisplayIdToAllBatteries();
+
+    // NOUVEAU : Envoyer H=7 à une batterie spécifique
+    bool sendDisplayIdToBattery(uint8_t batteryId);
+
     // Test de base
     void testModbus();
 };

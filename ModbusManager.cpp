@@ -45,9 +45,72 @@ bool ModbusManager::sendDisplayIdCommand()
     return true;
 }
 
+bool ModbusManager::sendDisplayIdToAllBatteries()
+{
+    Serial.println("\n=== ENVOI H=7 À TOUTES LES BATTERIES (ID 1-9) ===");
+
+    // Boucle sur tous les IDs possibles (1 à 9)
+    for (uint8_t batteryId = 1; batteryId <= 9; batteryId++)
+    {
+        Serial.printf("Envoi H=7 à batterie ID=%d\n", batteryId);
+
+        sendDisplayIdToBattery(batteryId);
+
+        // Petit délai entre chaque batterie
+        delay(200);
+    }
+
+    Serial.println("=== Terminé ! Vérifiez l'affichage sur vos batteries ===");
+
+    return true;
+}
+
+bool ModbusManager::sendDisplayIdToBattery(uint8_t batteryId)
+{
+    // Construction de la trame H=7 pour une batterie spécifique
+    // Format: ID 10 01 F1 00 04 37 00 00 00 07 00 00 00 CRC_L CRC_H
+
+    sendBuffer[0] = batteryId; // ID de la batterie (1-9)
+    sendBuffer[1] = 0x10;      // Fonction écriture multiple registres
+    sendBuffer[2] = 0x01;      // Adresse registre 0x01F1 (high byte)
+    sendBuffer[3] = 0xF1;      // Adresse registre 0x01F1 (low byte)
+    sendBuffer[4] = 0x00;      // Nombre de registres (high byte)
+    sendBuffer[5] = 0x04;      // Nombre de registres (low byte)
+    sendBuffer[6] = 0x37;      // 37 = selon votre format qui marchait
+    sendBuffer[7] = 0x00;      // Données: 00 00 00 07
+    sendBuffer[8] = 0x00;
+    sendBuffer[9] = 0x00;
+    sendBuffer[10] = DISPLAY_ID_CMD; // 07 = H=7
+    sendBuffer[11] = 0x00;           // Padding: 00 00 00
+    sendBuffer[12] = 0x00;
+    sendBuffer[13] = 0x00;
+
+    // Calculer le CRC sur les 14 premiers bytes
+    uint16_t crc = calculateCRC16(sendBuffer, 14);
+    sendBuffer[14] = crc & 0xFF;        // CRC low byte
+    sendBuffer[15] = (crc >> 8) & 0xFF; // CRC high byte
+
+    // Debug : afficher la trame
+    char label[20];
+    sprintf(label, "H=7 ID=%d", batteryId);
+    printBuffer(label, sendBuffer, 16);
+
+    // Vider le buffer de réception
+    while (serial->available())
+    {
+        serial->read();
+    }
+
+    // Envoyer la trame
+    serial->write(sendBuffer, 16);
+    serial->flush();
+
+    return true;
+}
+
 int ModbusManager::buildDisplayCommand(uint8_t displayValue)
 {
-    // ESSAI avec le format de votre documentation
+    // Format original qui marchait avec 0x81
     // 81 10 01 F1 00 04 37 00 00 00 XX 00 00 00
 
     sendBuffer[0] = MASTER_ADDR; // 81 = Adresse maître
@@ -56,21 +119,21 @@ int ModbusManager::buildDisplayCommand(uint8_t displayValue)
     sendBuffer[3] = 0xF1;        // 01 F1 = Adresse de départ (low byte)
     sendBuffer[4] = 0x00;        // 00 04 = Nombre de registres (high byte)
     sendBuffer[5] = 0x04;        // 00 04 = Nombre de registres (low byte)
-    sendBuffer[6] = 0x37;        // 37 = selon votre doc (au lieu de 08)
+    sendBuffer[6] = 0x37;        // 37 = selon votre format
     sendBuffer[7] = 0x00;        // Données : 00 00 00 XX
     sendBuffer[8] = 0x00;
     sendBuffer[9] = 0x00;
     sendBuffer[10] = displayValue; // XX = valeur H (7 ou 9)
-    sendBuffer[11] = 0x00;         // Padding : 00 00 00 00
+    sendBuffer[11] = 0x00;         // Padding : 00 00 00
     sendBuffer[12] = 0x00;
     sendBuffer[13] = 0x00;
 
-    // Calculer le CRC sur les 14 premiers bytes (trame plus courte)
+    // Calculer le CRC sur les 14 premiers bytes
     uint16_t crc = calculateCRC16(sendBuffer, 14);
     sendBuffer[14] = crc & 0xFF;        // CRC_L (low byte)
     sendBuffer[15] = (crc >> 8) & 0xFF; // CRC_H (high byte)
 
-    return 16; // Longueur totale de la trame (plus courte)
+    return 16; // Longueur totale de la trame
 }
 
 uint16_t ModbusManager::calculateCRC16(uint8_t *data, uint8_t length)
