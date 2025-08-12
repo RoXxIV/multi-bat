@@ -8,7 +8,8 @@
 // Écrans gérés
 enum ScreenState
 {
-    SCREEN_MAIN_MENU = 0,
+    SCREEN_MAIN_DATA = 0, // NOUVEAU : Écran principal avec données
+    SCREEN_MAIN_MENU,     // Ancien écran menu (renommé)
     SCREEN_CODE_INPUT,
     SCREEN_CODE_RESULT
 };
@@ -86,6 +87,7 @@ private:
 
     // Construction / rendu
     void buildMenuItems(); // (re)construit le menu selon admin on/off
+    void displayMainData();
     void displayMainMenu();
     void displayCodeInput();
     void displayCodeResult();

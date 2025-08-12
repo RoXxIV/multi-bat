@@ -1,14 +1,47 @@
 #include "MenuManager.h"
 
-MenuManager::MenuManager(DisplayManager *displayMgr)
-    : display(displayMgr),
-      currentState(SCREEN_MAIN_MENU),
-      selectedMenuItem(0),
-      totalMenuItems(0),
-      adminAuthenticated(false),
-      currentDigit(0),
-      resultTimer(0),
-      codeSuccess(false) {}
+void MenuManager::displayMainData()
+{
+    display->clear();
+
+    // Données fictives pour test
+    float soc = 75.5;              // %
+    float voltage = 51.2;          // V
+    float current = -12.3;         // A (négatif = charge)
+    float chargeSetpoint = 450;    // A
+    float dischargeSetpoint = 600; // A
+    float avgTemp = 23.4;          // °C
+
+    // Ligne 1 : SOC et Tension
+    display->drawText(5, 12, ("SOC:" + String(soc, 1) + "%").c_str());
+    display->drawText(70, 12, ("V:" + String(voltage, 1) + "V").c_str());
+
+    // Ligne 2 : Intensité et Température
+    display->drawText(5, 22, ("I:" + String(current, 1) + "A").c_str());
+    display->drawText(70, 22, ("Temp:" + String(avgTemp, 1) + "C").c_str());
+
+    // Ligne 3 : Consignes
+    display->drawText(5, 32, ("Ch:" + String((int)chargeSetpoint) + "A").c_str());
+    display->drawText(70, 32, ("Dch:" + String((int)dischargeSetpoint) + "A").c_str());
+
+    // Ligne 5 : Boutons
+    display->drawText(5, 55, "R:N/A");
+    display->drawText(80, 55, "OK:menu");
+
+    display->show();
+}
+#include "MenuManager.h"
+
+MenuManager::MenuManager(DisplayManager *displayMgr) : display(displayMgr),
+                                                       currentState(SCREEN_MAIN_DATA), // Commencer par l'écran de données
+                                                       selectedMenuItem(0),
+                                                       totalMenuItems(0),
+                                                       adminAuthenticated(false),
+                                                       currentDigit(0),
+                                                       resultTimer(0),
+                                                       codeSuccess(false)
+{
+}
 
 void MenuManager::begin()
 {
@@ -62,6 +95,7 @@ void MenuManager::navigateUp()
     {
         codeDigits[currentDigit] = (codeDigits[currentDigit] + 1) % 10;
     }
+    // MAIN_DATA : pas de navigation up/down
 }
 
 void MenuManager::navigateDown()
@@ -76,11 +110,18 @@ void MenuManager::navigateDown()
     {
         codeDigits[currentDigit] = (codeDigits[currentDigit] + 9) % 10; // -1 mod 10
     }
+    // MAIN_DATA : pas de navigation up/down
 }
 
 void MenuManager::selectCurrentItem()
 {
-    if (currentState == SCREEN_MAIN_MENU)
+    if (currentState == SCREEN_MAIN_DATA)
+    {
+        // OK sur l'écran principal → aller au menu
+        currentState = SCREEN_MAIN_MENU;
+        Serial.println("Passage vers le menu");
+    }
+    else if (currentState == SCREEN_MAIN_MENU)
     {
         executeMenuAction(selectedMenuItem);
     }
@@ -105,8 +146,14 @@ void MenuManager::goBack()
 {
     switch (currentState)
     {
+    case SCREEN_MAIN_DATA:
+        // Retour depuis l'écran principal : ne fait rien (ou mode veille)
+        Serial.println("Retour: unknow");
+        break;
     case SCREEN_MAIN_MENU:
-        // rien
+        // Retour depuis le menu → écran principal
+        currentState = SCREEN_MAIN_DATA;
+        Serial.println("Retour vers écran principal");
         break;
     case SCREEN_CODE_INPUT:
         if (currentDigit > 0)
@@ -159,6 +206,9 @@ void MenuManager::updateDisplay()
 {
     switch (currentState)
     {
+    case SCREEN_MAIN_DATA:
+        displayMainData();
+        break;
     case SCREEN_MAIN_MENU:
         displayMainMenu();
         break;
@@ -307,7 +357,13 @@ void MenuManager::deactivateAdmin()
 
 // ——— Stubs d'actions
 void MenuManager::actionDisplayIds() { Serial.println("Action: Afficher ID batteries"); }
-void MenuManager::actionPairing() { Serial.println("Action: Effectuer appairage (ADMIN)"); }
+
+void MenuManager::actionPairing()
+{
+    Serial.println("=== DÉBUT APPAIRAGE DES BATTERIES ===");
+    // Cette fonction sera appelée depuis le main avec accès au ModbusManager
+}
+
 void MenuManager::actionErrors() { Serial.println("Action: Affichage erreurs"); }
 void MenuManager::actionIndividual() { Serial.println("Action: Batteries individuelles"); }
 void MenuManager::actionSystemSettings() { Serial.println("Action: Parametres systeme (ADMIN)"); }

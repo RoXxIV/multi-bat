@@ -50,7 +50,7 @@ void loop()
 
 void handleOkButton()
 {
-  // Si on est en mode admin et qu'on sélectionne l'appairage
+  // Si on est en mode admin et dans le menu (pas écran principal)
   if (menuMgr.getCurrentState() == SCREEN_MAIN_MENU &&
       menuMgr.isAdminAuthenticated())
   {
@@ -59,7 +59,7 @@ void handleOkButton()
     modbus.sendDisplayIdToAllBatteries();
   }
 
-  // Action normale du menu
+  // Action normale (gère l'écran principal → menu)
   menuMgr.selectCurrentItem();
 }
 
