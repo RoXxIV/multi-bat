@@ -22,16 +22,16 @@ void MenuManager::buildMenuItems()
 {
     totalMenuItems = 0;
 
-    // Items de base
+    // Items de base (utilisateur standard)
     menuItems[totalMenuItems++] = {"Afficher ID batteries", ACTION_DISPLAY_IDS, false};
-    menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, false};
     menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
     menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, false};
     menuItems[totalMenuItems++] = {"Mode admin", ACTION_ADMIN_CODE, false};
 
-    // Items admin si authentifié
+    // Items admin uniquement
     if (adminAuthenticated)
     {
+        menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, true};
         menuItems[totalMenuItems++] = {"Parametres systeme", ACTION_SYSTEM_SETTINGS, true};
     }
 
@@ -186,7 +186,19 @@ void MenuManager::displayMainMenu()
         int idx = viewTop + j;
         int y = 25 + j * 10;
         bool sel = (idx == selectedMenuItem);
-        display->drawText(10, y, menuItems[idx].text, false, sel);
+
+        // Marquer visuellement les items admin
+        const char *itemText = menuItems[idx].text;
+        if (menuItems[idx].isAdminItem)
+        {
+            // Ajouter un indicateur pour les items admin
+            display->drawText(10, y, itemText, false, sel);
+            display->drawText(2, y, "*", false, false); // Astérisque pour marquer admin
+        }
+        else
+        {
+            display->drawText(10, y, itemText, false, sel);
+        }
     }
 
     // Curseur
@@ -279,7 +291,7 @@ void MenuManager::activateAdmin()
     {
         adminAuthenticated = true;
         buildMenuItems();
-        Serial.println("Admin activé (menu étendu)");
+        Serial.println("Admin activé - Appairage et paramètres disponibles");
     }
 }
 
@@ -289,13 +301,13 @@ void MenuManager::deactivateAdmin()
     {
         adminAuthenticated = false;
         buildMenuItems();
-        Serial.println("Admin désactivé (menu de base)");
+        Serial.println("Admin désactivé - Mode utilisateur standard");
     }
 }
 
 // ——— Stubs d'actions
 void MenuManager::actionDisplayIds() { Serial.println("Action: Afficher ID batteries"); }
-void MenuManager::actionPairing() { Serial.println("Action: Effectuer appairage"); }
+void MenuManager::actionPairing() { Serial.println("Action: Effectuer appairage (ADMIN)"); }
 void MenuManager::actionErrors() { Serial.println("Action: Affichage erreurs"); }
 void MenuManager::actionIndividual() { Serial.println("Action: Batteries individuelles"); }
-void MenuManager::actionSystemSettings() { Serial.println("Action: Parametres systeme"); }
+void MenuManager::actionSystemSettings() { Serial.println("Action: Parametres systeme (ADMIN)"); }

@@ -15,6 +15,11 @@
 #define BTN_OK_PIN 36
 #define BTN_BACK_PIN 0
 
+// Pins Modbus (Serial2 sur ESP32)
+#define MODBUS_RX_PIN 16
+#define MODBUS_TX_PIN 17
+#define MODBUS_SERIAL Serial2
+
 // ——————— CONFIGURATION SYSTÈME ———————
 // Code d'accès admin (3 chiffres)
 #define ADMIN_CODE_1 6
@@ -28,10 +33,16 @@
 // Limites
 #define MAX_MENU_ITEMS 10
 
+// ——————— CONFIGURATION MODBUS ———————
+// Paramètres Daly BMS
+#define MODBUS_BAUD 9600
+#define MODBUS_CONFIG SERIAL_8N1
+#define MAX_BATTERIES 8
+
 // ——————— FONCTIONS UTILITAIRES ———————
 inline void printSystemInfo()
 {
-    Serial.printf("Multi-Batterie v1.0 - RAM: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("Multi-Batterie v2.3 - RAM: %d bytes\n", ESP.getFreeHeap());
 }
 
 #endif
