@@ -70,14 +70,14 @@ bool ModbusManager::sendDisplayIdToBattery(uint8_t batteryId)
     // Construction de la trame H=7 pour une batterie spécifique
     // Format: ID 10 01 F1 00 04 37 00 00 00 07 00 00 00 CRC_L CRC_H
 
-    sendBuffer[0] = batteryId; // ID de la batterie (1-9)
-    sendBuffer[1] = 0x10;      // Fonction écriture multiple registres
-    sendBuffer[2] = 0x01;      // Adresse registre 0x01F1 (high byte)
-    sendBuffer[3] = 0xF1;      // Adresse registre 0x01F1 (low byte)
-    sendBuffer[4] = 0x00;      // Nombre de registres (high byte)
-    sendBuffer[5] = 0x04;      // Nombre de registres (low byte)
-    sendBuffer[6] = 0x37;      // 37 = selon votre format qui marchait
-    sendBuffer[7] = 0x00;      // Données: 00 00 00 07
+    sendBuffer[0] = 0x80 + batteryId; // ID de la batterie (1-9)
+    sendBuffer[1] = 0x10;             // Fonction écriture multiple registres
+    sendBuffer[2] = 0x01;             // Adresse registre 0x01F1 (high byte)
+    sendBuffer[3] = 0xF1;             // Adresse registre 0x01F1 (low byte)
+    sendBuffer[4] = 0x00;             // Nombre de registres (high byte)
+    sendBuffer[5] = 0x04;             // Nombre de registres (low byte)
+    sendBuffer[6] = 0x37;             // 37 = selon votre format qui marchait
+    sendBuffer[7] = 0x00;             // Données: 00 00 00 07
     sendBuffer[8] = 0x00;
     sendBuffer[9] = 0x00;
     sendBuffer[10] = DISPLAY_ID_CMD; // 07 = H=7
