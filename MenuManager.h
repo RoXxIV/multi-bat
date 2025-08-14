@@ -1,110 +1,68 @@
 #ifndef MENU_MANAGER_H
 #define MENU_MANAGER_H
 
-#include <Arduino.h>
-#include "DisplayManager.h"
 #include "Config.h"
+#include "DisplayManager.h"
 
-// Écrans gérés
-enum ScreenState
-{
-    SCREEN_MAIN_DATA = 0, // NOUVEAU : Écran principal avec données
-    SCREEN_MAIN_MENU,     // Ancien écran menu (renommé)
-    SCREEN_CODE_INPUT,
-    SCREEN_CODE_RESULT
-};
+// ——————— VARIABLES GLOBALES MENU ———————
+extern int currentScreen;
+extern int selectedMenuItem;
+extern int totalMenuItems;
+extern int menuViewTop;
+extern bool adminMode;
 
-// Actions des items de menu
-enum MenuAction
-{
-    ACTION_DISPLAY_IDS,
-    ACTION_PAIRING,
-    ACTION_ERRORS,
-    ACTION_INDIVIDUAL,
-    ACTION_ADMIN_CODE,
-    ACTION_SYSTEM_SETTINGS
-};
+// Variables pour le code admin
+extern int codeDigits[3];
+extern int currentDigit;
+extern unsigned long resultTimer;
+extern bool codeSuccess;
 
-// Élément de menu simplifié
-struct MenuItem
-{
-    const char *text;
-    MenuAction action;
-    bool isAdminItem;
-};
+// Menu items
+extern MenuItem menuItems[MAX_MENU_ITEMS];
 
-class MenuManager
-{
-public:
-    explicit MenuManager(DisplayManager *displayMgr);
+// ——————— FONCTIONS PUBLIQUES ———————
 
-    void begin();
+// Initialisation
+void initMenu();
+void buildMenu();
 
-    // Navigation déclenchée par les boutons
-    void navigateUp();
-    void navigateDown();
-    void selectCurrentItem();
-    void goBack();
+// Navigation (appelées par les boutons)
+void navigateMenuUp();
+void navigateMenuDown();
+void selectMenuItem();
+void goBackMenu();
 
-    // Rafraîchit l'affichage selon l'état courant
-    void updateDisplay();
+// Affichage (selon l'écran courant)
+void updateMenuDisplay();
 
-    // Getters
-    ScreenState getCurrentState() const { return currentState; }
-    bool isAdminAuthenticated() const { return adminAuthenticated; }
-    int getTotalMenuItems() const { return totalMenuItems; }
+// Écrans spécifiques
+void showMainDataScreen();
+void showMenuScreen();
+void showCodeInputScreen();
+void showCodeResultScreen();
 
-    // Gestion du mode admin
-    void activateAdmin();
-    void deactivateAdmin();
+// Gestion du mode admin
+void activateAdminMode();
+void deactivateAdminMode();
+bool isAdminMode();
 
-    // Actions liées aux items (stubs)
-    static void actionDisplayIds();
-    static void actionPairing();
-    static void actionErrors();
-    static void actionIndividual();
-    static void actionSystemSettings();
+// Gestion du code admin
+void resetCodeInput();
+void checkAdminCode();
 
-private:
-    DisplayManager *display;
+// Actions des items de menu (à implémenter selon besoins)
+void actionDisplayIds();
+void actionShowErrors();
+void actionIndividualBatteries();
+void actionPairing();
+void actionSystemSettings();
 
-    // État UI
-    ScreenState currentState;
-    int selectedMenuItem;
-    int totalMenuItems;
-    bool adminAuthenticated;
+// Utilitaires internes
+void adjustMenuView();
+void executeMenuAction(int itemIndex);
 
-    // Saisie code admin
-    int codeDigits[3];
-    int currentDigit;
-
-    // Résultat code
-    unsigned long resultTimer;
-    bool codeSuccess;
-
-    // Menu courant
-    MenuItem menuItems[MAX_MENU_ITEMS];
-
-    // Construction / rendu
-    void buildMenuItems(); // (re)construit le menu selon admin on/off
-    void displayMainData();
-    void displayMainMenu();
-    void displayCodeInput();
-    void displayCodeResult();
-
-    // Code admin
-    void resetCodeInput();
-    void checkCode();
-
-    // Exécution d'un item
-    void executeMenuAction(int itemIndex);
-
-    // Fenêtre de défilement
-    static const int VISIBLE_COUNT = 4;
-    int viewTop = 0;
-
-    // Navigation simplifiée
-    void adjustView();
-};
+// Getters
+int getCurrentScreen();
+int getTotalMenuItems();
 
 #endif

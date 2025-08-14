@@ -6,66 +6,91 @@
 #include "ButtonManager.h"
 #include "ModbusManager.h"
 
+// ——————— OBJETS HARDWARE ———————
 // U8G2 (ex: SH1106 I2C)
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET);
 
-// Managers
-DisplayManager displayMgr(&u8g2);
-MenuManager menuMgr(&displayMgr);
-ButtonManager buttons;
-ModbusManager modbus(&MODBUS_SERIAL);
-
+// ——————— SETUP ———————
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("=== MULTI-BATTERIE v2.2 ===");
-  printSystemInfo();
+  Serial.println("=== MULTI-BATTERIE ===");
+  printSystemInfo(); // vvv
 
-  displayMgr.begin();
-  buttons.begin(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
-  buttons.setDebounceDelay(DEBOUNCE_DELAY);
-
-  modbus.begin();
-
-  menuMgr.begin();
+  // Initialisation des modules
+  initDisplay(&u8g2);
+  initButtons(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
+  setDebounceDelay(DEBOUNCE_DELAY);
+  initModbus(&MODBUS_SERIAL);
+  initMenu();
 
   Serial.println("Système prêt !");
 }
 
+// ——————— LOOP PRINCIPAL ———————
 void loop()
 {
-  buttons.update();
+  // Mettre à jour les boutons
+  updateButtons();
 
-  if (buttons.isUpPressed())
-    menuMgr.navigateUp();
-  if (buttons.isDownPressed())
-    menuMgr.navigateDown();
-  if (buttons.isOkPressed())
+  // Traiter les appuis de boutons
+  if (isUpPressed())
+  {
+    navigateMenuUp();
+  }
+
+  if (isDownPressed())
+  {
+    navigateMenuDown();
+  }
+
+  if (isOkPressed())
+  {
     handleOkButton();
-  if (buttons.isBackPressed())
-    menuMgr.goBack();
+  }
 
-  menuMgr.updateDisplay();
+  if (isBackPressed())
+  {
+    goBackMenu();
+  }
+
+  // Mettre à jour l'affichage
+  updateMenuDisplay();
+
+  // Petite pause pour éviter la surcharge CPU
+  delay(10);
 }
 
+// ——————— GESTION BOUTON OK ———————
 void handleOkButton()
 {
   // Si on est en mode admin et dans le menu (pas écran principal)
-  if (menuMgr.getCurrentState() == SCREEN_MAIN_MENU &&
-      menuMgr.isAdminAuthenticated())
+  if (getCurrentScreen() == SCREEN_MENU && isAdminMode())
   {
-
     Serial.println("=== DÉBUT TEST H=7 TOUTES BATTERIES ===");
-    modbus.sendDisplayIdToAllBatteries();
+    sendDisplayIdToAllBatteries();
   }
 
-  // Action normale (gère l'écran principal → menu)
-  menuMgr.selectCurrentItem();
+  // Action normale du menu (gère l'écran principal → menu)
+  selectMenuItem();
 }
 
-// Fonction de test rapide (si besoin depuis Serial Monitor)
+// ——————— FONCTIONS DE TEST ———————
+// Fonction de test rapide
 void testModbusNow()
 {
   Serial.println("=== TEST MANUEL MODBUS ===");
-  modbus.sendDisplayIdToAllBatteries();
+  sendDisplayIdToAllBatteries();
+}
+
+// Fonction de debug pour afficher l'état du système
+void printSystemStatus()
+{
+  Serial.println("\n=== ÉTAT DU SYSTÈME ===");
+  Serial.printf("Écran courant: %d\n", getCurrentScreen());
+  Serial.printf("Mode admin: %s\n", isAdminMode() ? "OUI" : "NON");
+  Serial.printf("Items de menu: %d\n", getTotalMenuItems());
+  Serial.printf("RAM libre: %d bytes\n", ESP.getFreeHeap());
+  printButtonStates();
+  Serial.println("========================\n");
 }

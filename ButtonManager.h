@@ -1,63 +1,35 @@
 #ifndef BUTTON_MANAGER_H
 #define BUTTON_MANAGER_H
 
-#include <Arduino.h>
+#include "Config.h"
 
-// Énumération des types de boutons
-enum ButtonType
-{
-    BTN_TYPE_UP = 0,
-    BTN_TYPE_DOWN,
-    BTN_TYPE_OK,
-    BTN_TYPE_BACK,
-    BTN_COUNT
-};
+// ——————— VARIABLES GLOBALES BOUTONS ———————
+extern ButtonState buttons[BTN_COUNT];
+extern unsigned long debounceDelay;
 
-// Structure pour l'état d'un bouton
-struct ButtonState
-{
-    int pin;                    // Pin du bouton
-    bool currentState;          // État actuel (HIGH/LOW)
-    bool previousState;         // État précédent
-    unsigned long lastDebounce; // Timestamp du dernier changement
+// ——————— FONCTIONS PUBLIQUES ———————
 
-    // Méthode unique : appui simple
-    bool pressed(); // Front montant (appui unique)
-};
+// Initialisation
+void initButtons(int upPin, int downPin, int okPin, int backPin);
+void setDebounceDelay(unsigned long delay);
 
-class ButtonManager
-{
-private:
-    ButtonState buttons[BTN_COUNT];
-    unsigned long debounceDelay;
+// Mise à jour (à appeler dans loop)
+void updateButtons();
+void updateSingleButton(int buttonIndex);
 
-    // Méthodes privées
-    void updateButton(ButtonType buttonType);
+// Test d'appui simple (front montant)
+bool isButtonPressed(int buttonIndex);
+bool isUpPressed();
+bool isDownPressed();
+bool isOkPressed();
+bool isBackPressed();
 
-public:
-    // Constructeur
-    ButtonManager();
+// Utilitaires
+bool anyButtonPressed();
+void resetAllButtons();
 
-    // Configuration simplifiée
-    void begin(int upPin, int downPin, int okPin, int backPin);
-    void setDebounceDelay(unsigned long delay) { debounceDelay = delay; }
-
-    // Méthode principale
-    void update(); // À appeler dans loop()
-
-    // Getters simplifiés - UNIQUEMENT appuis uniques
-    bool isUpPressed() { return buttons[BTN_TYPE_UP].pressed(); }
-    bool isDownPressed() { return buttons[BTN_TYPE_DOWN].pressed(); }
-    bool isOkPressed() { return buttons[BTN_TYPE_OK].pressed(); }
-    bool isBackPressed() { return buttons[BTN_TYPE_BACK].pressed(); }
-
-    // Utilitaires
-    bool anyPressed(); // N'importe quel bouton pressé
-    void resetAll();   // Reset de tous les états
-
-    // Debug
-    void printStates(); // Affiche l'état de tous les boutons
-    const char *getButtonName(ButtonType type);
-};
+// Debug
+void printButtonStates();
+const char *getButtonName(int buttonIndex);
 
 #endif
