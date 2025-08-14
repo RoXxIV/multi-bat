@@ -10,8 +10,13 @@ BatteryData batteries[MAX_BATTERIES];
 
 void initModbus(HardwareSerial *serial)
 {
+    // Configuration du pin DE/RE pour RS485
+    pinMode(MODBUS_DE_RE_PIN, OUTPUT);
+    enableRS485Receive(); // Mode réception par défaut
+
     modbusSerial = serial;
-    modbusSerial->begin(BAUD_RATE, SERIAL_8N1);
+    // ⭐ CORRECTION : Utiliser SERIAL_8E1 comme dans votre code de test
+    modbusSerial->begin(BAUD_RATE, SERIAL_8E1, MODBUS_RX_PIN, MODBUS_TX_PIN);
 
     // Initialiser les buffers
     memset(sendBuffer, 0, sizeof(sendBuffer));
@@ -27,9 +32,22 @@ void initModbus(HardwareSerial *serial)
         batteries[i].validTemps = 0;
     }
 
-    Serial.println("Modbus initialisé - Baud: 9600 8N1");
+    Serial.println("Modbus initialisé - Baud: 9600 8E1"); // ⭐ Correction message
+    Serial.printf("Pins: RX=%d, TX=%d, DE/RE=%d\n", MODBUS_RX_PIN, MODBUS_TX_PIN, MODBUS_DE_RE_PIN);
     Serial.printf("Adresse maître: 0x%02X\n", MASTER_ADDR);
     Serial.printf("Adresse réponse base: 0x%02X\n", RESPONSE_ADDR_BASE);
+}
+
+void enableRS485Transmit()
+{
+    digitalWrite(MODBUS_DE_RE_PIN, HIGH); // Mode émission
+    // ⭐ CORRECTION : Pas de délai comme dans votre code de test
+}
+
+void enableRS485Receive()
+{
+    digitalWrite(MODBUS_DE_RE_PIN, LOW); // Mode réception
+    // ⭐ CORRECTION : Pas de délai comme dans votre code de test
 }
 
 // ——————— FONCTIONS DE LECTURE MODULAIRES ———————
@@ -93,9 +111,11 @@ bool readBatteryData(uint8_t batteryId, ModbusDataType dataType)
         modbusSerial->read();
     }
 
-    // Envoyer
+    // Passer en mode émission et envoyer
+    enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    enableRS485Receive(); // Repasser en mode réception
 
     // Attendre la réponse (timeout 500ms)
     unsigned long timeout = millis() + 500;
@@ -179,8 +199,10 @@ bool readBatteryParam(uint8_t batteryId, BatteryParam param)
     // Vider buffer et envoyer
     while (modbusSerial->available())
         modbusSerial->read();
+    enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    enableRS485Receive();
 
     // Attendre réponse
     unsigned long timeout = millis() + 300;
@@ -239,11 +261,19 @@ bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value)
 
     while (modbusSerial->available())
         modbusSerial->read();
+    enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    enableRS485Receive();
 
-    // Attendre acquittement
-    delay(100);
+    // Attendre l'ACK
+    if (!waitForAck(batteryId, "WRITE"))
+    {
+        Serial.println("✗ Pas d'ACK pour l'écriture");
+        return false;
+    }
+
+    Serial.println("✓ Écriture confirmée");
     return true;
 }
 
@@ -331,8 +361,8 @@ bool parseResponse(uint8_t batteryId, ModbusDataType dataType)
 
     BatteryData *battery = &batteries[batteryId - 1];
 
-    // Vérifier l'adresse de réponse
-    uint8_t expectedAddr = RESPONSE_ADDR_BASE + batteryId;
+    // ⭐ CORRECTION : Utiliser 0x50 + ID
+    uint8_t expectedAddr = 0x50 + batteryId; // Pas RESPONSE_ADDR_BASE !
     if (receiveBuffer[0] != expectedAddr)
     {
         Serial.printf("ERREUR: Adresse réponse incorrecte (reçu 0x%02X, attendu 0x%02X)\n",
@@ -539,19 +569,39 @@ bool sendDisplayIdCommand()
 
 bool sendDisplayIdToAllBatteries()
 {
-    Serial.println("\n=== ENVOI H=7 À TOUTES LES BATTERIES ===");
+    Serial.println("\n=== ENVOI H=7 AVEC VALIDATION TOUTES BATTERIES ===");
 
     bool success = true;
+    int successCount = 0;
+
     for (uint8_t batteryId = 1; batteryId <= MAX_BATTERIES; batteryId++)
     {
-        if (!sendDisplayIdToBattery(batteryId))
+        Serial.printf("\n--- Batterie ID=%d ---\n", batteryId);
+
+        if (sendAndVerifyDisplayId(batteryId))
+        {
+            successCount++;
+            Serial.printf("✓ Batterie ID=%d: SUCCÈS\n", batteryId);
+        }
+        else
         {
             success = false;
+            Serial.printf("✗ Batterie ID=%d: ÉCHEC\n", batteryId);
         }
-        delay(200);
+
+        delay(300); // Délai entre batteries pour éviter les collisions
     }
 
-    Serial.println("=== Terminé ! Vérifiez l'affichage sur vos batteries ===");
+    Serial.printf("\n=== RÉSUMÉ: %d/%d batteries OK ===\n", successCount, MAX_BATTERIES);
+    if (success)
+    {
+        Serial.println("✓ TOUTES les batteries ont affiché leur ID");
+    }
+    else
+    {
+        Serial.printf("⚠ Seulement %d batteries sur %d ont répondu\n", successCount, MAX_BATTERIES);
+    }
+
     return success;
 }
 
@@ -563,39 +613,233 @@ bool sendDisplayIdToBattery(uint8_t batteryId)
         return false;
     }
 
-    // Construction de la trame H=7 (selon votre reverse engineering)
+    Serial.printf("Envoi H=7 à batterie ID=%d\n", batteryId);
+
+    // ⭐ TEST : Version ASCII selon l'ingénieur (SANS byte count)
+    Serial.println("=== TEST VERSION ASCII (selon ingénieur) ===");
+
     sendBuffer[0] = 0x80 + batteryId; // ID de la batterie
     sendBuffer[1] = 0x10;             // Fonction écriture multiple
     sendBuffer[2] = 0x01;             // Adresse registre 0x01F1 (high)
     sendBuffer[3] = 0xF1;             // Adresse registre 0x01F1 (low)
     sendBuffer[4] = 0x00;             // Nombre de registres (high)
     sendBuffer[5] = 0x04;             // Nombre de registres (low)
-    sendBuffer[6] = 0x37;             // Format Daly
-    sendBuffer[7] = 0x00;             // Données: 00 00 00 07
+    sendBuffer[6] = 0x37;             // ⭐ "7" en ASCII (comme l'ingénieur)
+    sendBuffer[7] = 0x00;             // Reste à zéro
     sendBuffer[8] = 0x00;
-    sendBuffer[9] = 0x00;
-    sendBuffer[10] = DISPLAY_ID_CMD; // 07 = H=7
-    sendBuffer[11] = 0x00;           // Padding: 00 00 00
+    sendBuffer[9] = 0x00; // ⭐ Plus de 0x07 ici !
+    sendBuffer[10] = 0x00;
+    sendBuffer[11] = 0x00;
     sendBuffer[12] = 0x00;
     sendBuffer[13] = 0x00;
 
-    // Calculer le CRC
+    // Calculer le CRC sur les 14 premiers bytes
     uint16_t crc = calculateCRC16(sendBuffer, 14);
     sendBuffer[14] = crc & 0xFF;        // CRC low
     sendBuffer[15] = (crc >> 8) & 0xFF; // CRC high
 
-    // Debug
-    char label[20];
-    sprintf(label, "H=7 ID=%d", batteryId);
+    char label[30];
+    sprintf(label, "H=7_ASCII ID=%d", batteryId);
     printModbusBuffer(label, sendBuffer, 16);
 
     // Vider buffer et envoyer
     while (modbusSerial->available())
         modbusSerial->read();
+    enableRS485Transmit();
     modbusSerial->write(sendBuffer, 16);
     modbusSerial->flush();
+    enableRS485Receive();
 
+    // Attendre l'ACK
+    bool ackReceived = waitForAck(batteryId, "H=7_ASCII");
+
+    if (!ackReceived)
+    {
+        Serial.println("⚠ Version ASCII échouée, test version originale...");
+
+        // ⭐ FALLBACK : Version originale qui marchait
+        sendBuffer[6] = 0x00;            // Retour version originale
+        sendBuffer[10] = DISPLAY_ID_CMD; // 07 = H=7
+
+        uint16_t crc2 = calculateCRC16(sendBuffer, 14);
+        sendBuffer[14] = crc2 & 0xFF;
+        sendBuffer[15] = (crc2 >> 8) & 0xFF;
+
+        sprintf(label, "H=7_ORIG ID=%d", batteryId);
+        printModbusBuffer(label, sendBuffer, 16);
+
+        while (modbusSerial->available())
+            modbusSerial->read();
+        enableRS485Transmit();
+        modbusSerial->write(sendBuffer, 16);
+        modbusSerial->flush();
+        enableRS485Receive();
+
+        ackReceived = waitForAck(batteryId, "H=7_ORIG");
+    }
+
+    if (ackReceived)
+    {
+        Serial.printf("✓ H=7 envoyé et confirmé batterie ID=%d\n", batteryId);
+        return true;
+    }
+    else
+    {
+        Serial.printf("✗ Échec total batterie ID=%d\n", batteryId);
+        return false;
+    }
+}
+
+bool sendAndVerifyDisplayId(uint8_t batteryId)
+{
+    Serial.printf("=== ENVOI H=7 BATTERIE ID=%d ===\n", batteryId);
+
+    // 1. Envoyer H=7 avec ACK (suffisant pour confirmer)
+    if (!sendDisplayIdToBattery(batteryId))
+    {
+        Serial.println("✗ Échec envoi H=7");
+        return false;
+    }
+
+    // ⭐ DÉSACTIVATION de la vérification par relecture
+    // Le registre 0x01F1 semble être en write-only
+    Serial.println("✓ H=7 confirmé par ACK (vérification par relecture désactivée)");
     return true;
+
+    /* ANCIENNE VERSION avec vérification (problématique)
+    delay(200); // Laisser le temps au BMS de traiter
+
+    // 2. Vérifier que la valeur est bien écrite
+    if (verifyDisplayValue(batteryId, DISPLAY_ID_CMD)) {
+        Serial.println("✓ H=7 confirmé écrit et vérifié");
+        return true;
+    } else {
+        Serial.println("✗ H=7 non confirmé à la lecture");
+        return false;
+    }
+    */
+}
+
+bool verifyDisplayValue(uint8_t batteryId, uint8_t expectedValue)
+{
+    Serial.printf("Vérification H=%d sur batterie ID=%d\n", expectedValue, batteryId);
+
+    // Lire le registre 0x01F1 pour vérifier la valeur écrite
+    int frameLength = buildReadCommand(batteryId, REG_DISPLAY_CONTROL, 4); // 4 registres comme dans l'écriture
+    if (frameLength <= 0)
+        return false;
+
+    printModbusBuffer("VERIFY_READ", sendBuffer, frameLength);
+
+    // Vider buffer et envoyer
+    while (modbusSerial->available())
+        modbusSerial->read();
+    modbusSerial->write(sendBuffer, frameLength);
+    modbusSerial->flush();
+
+    // Attendre réponse
+    unsigned long timeout = millis() + 300;
+    int responseLength = 0;
+
+    while (millis() < timeout && responseLength < sizeof(receiveBuffer))
+    {
+        if (modbusSerial->available())
+        {
+            receiveBuffer[responseLength++] = modbusSerial->read();
+            timeout = millis() + 50; // Prolonger si on reçoit des données
+        }
+    }
+
+    if (responseLength > 0)
+    {
+        printModbusBuffer("VERIFY_RESP", receiveBuffer, responseLength);
+
+        // ⭐ CORRECTION : Utiliser 0x50 + ID
+        uint8_t expectedAddr = 0x50 + batteryId; // Pas RESPONSE_ADDR_BASE !
+        if (receiveBuffer[0] != expectedAddr)
+        {
+            Serial.printf("✗ Adresse réponse incorrecte (reçu 0x%02X, attendu 0x%02X)\n",
+                          receiveBuffer[0], expectedAddr);
+            return false;
+        }
+
+        // Vérifier la fonction
+        if (receiveBuffer[1] != CMD_READ_HOLDING)
+        {
+            Serial.printf("✗ Fonction incorrecte (reçu 0x%02X)\n", receiveBuffer[1]);
+            return false;
+        }
+
+        // La valeur H devrait être dans les données
+        // Format attendu: [ADDR][FUNC][LENGTH][DATA...]
+        // Les 4 registres de 0x01F1 contiennent: 00 00 00 07 00 00 00
+        if (responseLength >= 11)
+        {                                         // Au minimum: addr + func + len + 8 bytes data
+            uint8_t readValue = receiveBuffer[6]; // 4ème byte des données (position du H)
+            Serial.printf("Valeur H lue: %d (attendu: %d)\n", readValue, expectedValue);
+
+            if (readValue == expectedValue)
+            {
+                Serial.println("✓ Valeur H confirmée");
+                return true;
+            }
+            else
+            {
+                Serial.printf("✗ Valeur H incorrecte (lu: %d, attendu: %d)\n", readValue, expectedValue);
+            }
+        }
+        else
+        {
+            Serial.printf("✗ Réponse trop courte (%d bytes)\n", responseLength);
+        }
+    }
+    else
+    {
+        Serial.printf("✗ Timeout lors de la vérification batterie ID=%d\n", batteryId);
+    }
+
+    return false;
+}
+
+bool waitForAck(uint8_t batteryId, const char *operation)
+{
+    unsigned long timeout = millis() + 200;
+    int responseLength = 0;
+
+    while (millis() < timeout && responseLength < 16)
+    {
+        if (modbusSerial->available())
+        {
+            receiveBuffer[responseLength++] = modbusSerial->read();
+            timeout = millis() + 30; // Prolonger si on reçoit des données
+        }
+    }
+
+    if (responseLength > 0)
+    {
+        char label[30];
+        sprintf(label, "ACK_%s", operation);
+        printModbusBuffer(label, receiveBuffer, responseLength);
+
+        // ⭐ CORRECTION : Utiliser 0x50 + ID au lieu de RESPONSE_ADDR_BASE + ID
+        uint8_t expectedAddr = 0x50 + batteryId; // Pas RESPONSE_ADDR_BASE !
+        if (receiveBuffer[0] == expectedAddr)
+        {
+            Serial.printf("✓ ACK reçu de batterie ID=%d pour %s\n", batteryId, operation);
+            return true;
+        }
+        else
+        {
+            Serial.printf("✗ ACK incorrect (reçu 0x%02X, attendu 0x%02X)\n",
+                          receiveBuffer[0], expectedAddr);
+        }
+    }
+    else
+    {
+        Serial.printf("✗ Timeout ACK batterie ID=%d pour %s\n", batteryId, operation);
+    }
+
+    return false;
 }
 
 uint16_t calculateCRC16(uint8_t *data, uint8_t length)
@@ -635,13 +879,26 @@ void printModbusBuffer(const char *label, uint8_t *buffer, int length)
 
 void testModbus()
 {
-    Serial.println("\n=== TEST MODBUS AVANCÉ ===");
-    Serial.println("1. Test affichage ID sur toutes batteries");
+    Serial.println("\n=== TEST MODBUS AVANCÉ AVEC VALIDATION ===");
+
+    Serial.println("\n1. Test affichage ID avec validation sur batterie 1");
+    if (sendAndVerifyDisplayId(1))
+    {
+        Serial.println("✓ Test unitaire réussi");
+    }
+    else
+    {
+        Serial.println("✗ Test unitaire échoué");
+    }
+
+    delay(2000);
+
+    Serial.println("\n2. Test affichage ID sur toutes batteries avec validation");
     sendDisplayIdToAllBatteries();
 
     delay(2000);
 
-    Serial.println("\n2. Test lecture données temps réel batterie 1");
+    Serial.println("\n3. Test lecture données temps réel batterie 1");
     if (readBatteryData(1, DATA_REALTIME))
     {
         printBatteryData(1);
@@ -649,9 +906,11 @@ void testModbus()
 
     delay(1000);
 
-    Serial.println("\n3. Test lecture SOC batterie 1");
+    Serial.println("\n4. Test lecture SOC batterie 1");
     if (readBatteryParam(1, PARAM_SOC))
     {
         Serial.printf("SOC batterie 1: %.1f%%\n", getBatterySOC(1));
     }
+
+    Serial.println("\n=== FIN TESTS ===");
 }

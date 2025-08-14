@@ -18,6 +18,7 @@
 // Pins Modbus (Serial2 sur ESP32)
 #define MODBUS_RX_PIN 16
 #define MODBUS_TX_PIN 17
+#define MODBUS_DE_RE_PIN 18
 #define MODBUS_SERIAL Serial2
 
 // ——————— CONFIGURATION SYSTÈME ———————
@@ -31,8 +32,8 @@
 #define MESSAGE_TIMEOUT 2000 // ms
 
 // Limites
-#define MAX_MENU_ITEMS 10    // vvv
-#define VISIBLE_MENU_ITEMS 4 // vvv
+#define MAX_MENU_ITEMS 10
+#define VISIBLE_MENU_ITEMS 4
 
 // ——————— ÉNUMÉRATIONS ———————
 enum ButtonType
@@ -80,9 +81,9 @@ struct MenuItem
 
 // ——————— CONFIGURATION MODBUS ———————
 #define MODBUS_BAUD 9600
-#define MODBUS_CONFIG SERIAL_8N1
+#define MODBUS_CONFIG SERIAL_8E1 // ⭐ CORRECTION : 8E1 au lieu de 8N1
 #define MAX_BATTERIES 9
-#define MASTER_ADDR 0x81 // vvv
+#define MASTER_ADDR 0x81
 
 // ——————— FONCTIONS UTILITAIRES ———————
 inline void printSystemInfo()

@@ -118,16 +118,21 @@ extern BatteryData batteries[MAX_BATTERIES];
 
 // Initialisation
 void initModbus(HardwareSerial *serial);
+void enableRS485Transmit();
+void enableRS485Receive();
 
 // Fonctions de lecture modulaires
 bool readBatteryData(uint8_t batteryId, ModbusDataType dataType = DATA_REALTIME);
 bool readBatteryParam(uint8_t batteryId, BatteryParam param);
 bool readAllBatteriesData(ModbusDataType dataType = DATA_REALTIME);
 
-// Fonctions d'écriture
+// Fonctions d'écriture avec validation
 bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value);
 bool sendDisplayIdToBattery(uint8_t batteryId);
 bool sendDisplayIdToAllBatteries();
+bool sendAndVerifyDisplayId(uint8_t batteryId);
+bool verifyDisplayValue(uint8_t batteryId, uint8_t expectedValue);
+bool waitForAck(uint8_t batteryId, const char *operation);
 
 // Contrôles MOSFET
 bool setChargeMosfet(uint8_t batteryId, bool enable);
