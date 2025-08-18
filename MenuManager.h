@@ -41,6 +41,7 @@ void showMainDataScreen();
 void showMenuScreen();
 void showCodeInputScreen();
 void showCodeResultScreen();
+void showCanFramesScreen();
 
 // Gestion du mode admin
 void activateAdminMode();
@@ -57,6 +58,7 @@ void actionShowErrors();
 void actionIndividualBatteries();
 void actionPairing();
 void actionSystemSettings();
+void actionShowCanFrames();
 
 // Utilitaires internes
 void adjustMenuView();

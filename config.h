@@ -48,9 +48,10 @@ enum ButtonType
 enum ScreenType
 {
     SCREEN_MAIN_DATA = 0,
-    SCREEN_MENU,
-    SCREEN_CODE_INPUT,
-    SCREEN_CODE_RESULT
+    SCREEN_MENU = 1,
+    SCREEN_CODE_INPUT = 2,
+    SCREEN_CODE_RESULT = 3,
+    SCREEN_CAN_FRAMES = 4
 };
 
 enum MenuActions
@@ -60,7 +61,8 @@ enum MenuActions
     ACTION_INDIVIDUAL = 3,
     ACTION_ADMIN_CODE = 4,
     ACTION_PAIRING = 5,
-    ACTION_SYSTEM_SETTINGS = 6
+    ACTION_SYSTEM_SETTINGS = 6,
+    ACTION_CAN_FRAMES = 7
 };
 
 // ——————— STRUCTURES ———————

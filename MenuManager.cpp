@@ -1,4 +1,5 @@
 #include "MenuManager.h"
+#include "CanBusManager.h"
 
 // ——————— VARIABLES GLOBALES ———————
 int currentScreen = SCREEN_MAIN_DATA;
@@ -31,6 +32,7 @@ void buildMenu()
     menuItems[totalMenuItems++] = {"Afficher ID batteries", ACTION_DISPLAY_IDS, false};
     menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
     menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, false};
+    menuItems[totalMenuItems++] = {"Afficher trames CAN", ACTION_CAN_FRAMES, false};
     menuItems[totalMenuItems++] = {"Mode admin", ACTION_ADMIN_CODE, false};
 
     // Items admin uniquement
@@ -141,6 +143,11 @@ void goBackMenu()
     case SCREEN_CODE_RESULT:
         currentScreen = SCREEN_MENU;
         break;
+    case SCREEN_CAN_FRAMES:
+        setCanDisplayActive(false);
+        currentScreen = SCREEN_MENU;
+        Serial.println("Retour du menu CAN vers menu principal");
+        break;
     }
 }
 
@@ -160,6 +167,9 @@ void updateMenuDisplay()
         break;
     case SCREEN_CODE_RESULT:
         showCodeResultScreen();
+        break;
+    case SCREEN_CAN_FRAMES: // ⭐ MANQUE ICI !
+        showCanFramesScreen();
         break;
     }
 }
@@ -250,6 +260,12 @@ void showCodeResultScreen()
     }
 }
 
+void showCanFramesScreen()
+{
+    // Utiliser la fonction du CanBusManager
+    extern void showCanFrames();
+    showCanFrames();
+}
 // ——————— FONCTIONS UTILITAIRES ———————
 
 void adjustMenuView()
@@ -297,6 +313,9 @@ void executeMenuAction(int idx)
         break;
     case ACTION_SYSTEM_SETTINGS:
         actionSystemSettings();
+        break;
+    case ACTION_CAN_FRAMES:
+        actionShowCanFrames();
         break;
     }
 }
@@ -393,6 +412,14 @@ void actionSystemSettings()
     Serial.println("Action: Parametres systeme (ADMIN)");
 }
 
+void actionShowCanFrames()
+{
+    Serial.println("Action: Affichage trames CAN");
+    extern void setCanDisplayActive(bool active);
+    setCanDisplayActive(true);
+    currentScreen = SCREEN_CAN_FRAMES; // ⭐ CRUCIAL: changer l'écran
+    Serial.printf("DEBUG: currentScreen = %d\n", currentScreen);
+}
 // ——————— GETTERS ———————
 int getCurrentScreen()
 {
