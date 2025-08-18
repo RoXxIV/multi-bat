@@ -1,6 +1,6 @@
 #include "ButtonManager.h"
 
-// ——————— VARIABLES GLOBALES ———————
+// ——————— VARIABLES GLOBALES & SETUP ———————
 ButtonState buttons[BTN_COUNT];
 unsigned long debounceDelay = 50;
 
@@ -100,60 +100,4 @@ bool isOkPressed()
 bool isBackPressed()
 {
     return isButtonPressed(BTN_BACK);
-}
-
-// ——————— FONCTIONS UTILITAIRES ———————
-
-bool anyButtonPressed()
-{
-    for (int i = 0; i < BTN_COUNT; i++)
-    {
-        if (isButtonPressed(i))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-void resetAllButtons()
-{
-    for (int i = 0; i < BTN_COUNT; i++)
-    {
-        buttons[i].currentState = false;
-        buttons[i].previousState = false;
-        buttons[i].lastDebounce = millis();
-    }
-    Serial.println("Tous les boutons réinitialisés");
-}
-
-// ——————— FONCTIONS DEBUG ———————
-
-void printButtonStates()
-{
-    Serial.print("États boutons: ");
-    for (int i = 0; i < BTN_COUNT; i++)
-    {
-        Serial.printf("%s:%s ",
-                      getButtonName(i),
-                      buttons[i].currentState ? "ON" : "off");
-    }
-    Serial.println();
-}
-
-const char *getButtonName(int buttonIndex)
-{
-    switch (buttonIndex)
-    {
-    case BTN_UP:
-        return "UP";
-    case BTN_DOWN:
-        return "DOWN";
-    case BTN_OK:
-        return "OK";
-    case BTN_BACK:
-        return "BACK";
-    default:
-        return "UNKNOWN";
-    }
 }

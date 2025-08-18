@@ -15,7 +15,7 @@
 #define CMD_WRITE_SINGLE 0x06
 #define CMD_WRITE_MULTIPLE 0x10
 
-// Plages d'adresses selon votre reverse engineering
+// Plages d'adresses
 #define ADDR_REALTIME_START 0x0000
 #define ADDR_REALTIME_END 0x007F
 #define ADDR_SETTING1_START 0x0100
@@ -49,6 +49,10 @@
 // Commandes d'affichage
 #define DISPLAY_ID_CMD 7
 #define DISPLAY_ID_CONFIRM 9
+
+// Valeurs ASCII correspondantes
+#define ASCII_7 0x37 // "7" en ASCII
+#define ASCII_9 0x39 // "9" en ASCII
 
 // ——————— ÉNUMÉRATIONS ———————
 enum ModbusDataType
@@ -128,10 +132,8 @@ bool readAllBatteriesData(ModbusDataType dataType = DATA_REALTIME);
 
 // Fonctions d'écriture avec validation
 bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value);
-bool sendDisplayIdToBattery(uint8_t batteryId);
-bool sendDisplayIdToAllBatteries();
-bool sendAndVerifyDisplayId(uint8_t batteryId);
-bool verifyDisplayValue(uint8_t batteryId, uint8_t expectedValue);
+bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue);
+bool sendDisplayIdToAllBatteries(uint8_t asciiValue);
 bool waitForAck(uint8_t batteryId, const char *operation);
 
 // Contrôles MOSFET
@@ -152,10 +154,6 @@ int buildWriteCommand(uint8_t batteryId, uint16_t regAddr, uint16_t value);
 bool parseResponse(uint8_t batteryId, ModbusDataType dataType);
 void printModbusBuffer(const char *label, uint8_t *buffer, int length);
 void printBatteryData(uint8_t batteryId);
-
-// Debug et test
-void testModbus();
-void debugBatteryStatus();
 
 // Déclaration de la fonction de parsing
 void parseRealtimeData(BatteryData *battery, uint8_t *data, uint8_t length);

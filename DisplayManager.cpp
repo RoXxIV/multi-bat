@@ -4,7 +4,6 @@
 U8G2 *display_u8g2 = nullptr;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
-
 void initDisplay(U8G2 *u8g2_ptr)
 {
     display_u8g2 = u8g2_ptr;
@@ -16,7 +15,6 @@ void initDisplay(U8G2 *u8g2_ptr)
 }
 
 // ——————— FONCTIONS DE BASE ———————
-
 void clearDisplay()
 {
     if (display_u8g2)
@@ -34,7 +32,6 @@ void showDisplay()
 }
 
 // ——————— FONCTIONS DE DESSIN ———————
-
 void drawText(int x, int y, const char *text, bool large, bool inverted)
 {
     if (!display_u8g2)
@@ -81,7 +78,6 @@ void drawMenuCursor(int y)
 }
 
 // ——————— FONCTIONS UTILITAIRES ———————
-
 void showMessage(const char *title, const char *message)
 {
     clearDisplay();

@@ -3,6 +3,7 @@
 
 #include "Config.h"
 #include "DisplayManager.h"
+#include "ModbusManager.h"
 
 // ——————— VARIABLES GLOBALES MENU ———————
 extern int currentScreen;

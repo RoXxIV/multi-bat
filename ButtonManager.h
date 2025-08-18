@@ -24,12 +24,4 @@ bool isDownPressed();
 bool isOkPressed();
 bool isBackPressed();
 
-// Utilitaires
-bool anyButtonPressed();
-void resetAllButtons();
-
-// Debug
-void printButtonStates();
-const char *getButtonName(int buttonIndex);
-
 #endif

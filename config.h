@@ -29,7 +29,7 @@
 
 // Timing
 #define DEBOUNCE_DELAY 50    // ms
-#define MESSAGE_TIMEOUT 2000 // ms
+#define MESSAGE_TIMEOUT 1500 // ms
 
 // Limites
 #define MAX_MENU_ITEMS 10
@@ -84,11 +84,5 @@ struct MenuItem
 #define MODBUS_CONFIG SERIAL_8E1 // ⭐ CORRECTION : 8E1 au lieu de 8N1
 #define MAX_BATTERIES 9
 #define MASTER_ADDR 0x81
-
-// ——————— FONCTIONS UTILITAIRES ———————
-inline void printSystemInfo()
-{
-    Serial.printf("Multi-Batterie v3.0 - RAM: %d bytes\n", ESP.getFreeHeap());
-}
 
 #endif

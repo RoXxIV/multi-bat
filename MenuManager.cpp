@@ -6,18 +6,15 @@ int selectedMenuItem = 0;
 int totalMenuItems = 0;
 int menuViewTop = 0;
 bool adminMode = false;
-
 // Code admin
 int codeDigits[3] = {0, 0, 0};
 int currentDigit = 0;
 unsigned long resultTimer = 0;
 bool codeSuccess = false;
-
 // Menu items
 MenuItem menuItems[MAX_MENU_ITEMS];
 
 // ——————— FONCTIONS D'INITIALISATION ———————
-
 void initMenu()
 {
     buildMenu();
@@ -59,7 +56,6 @@ void buildMenu()
 }
 
 // ——————— FONCTIONS DE NAVIGATION ———————
-
 void navigateMenuUp()
 {
     if (currentScreen == SCREEN_MENU)
@@ -149,7 +145,6 @@ void goBackMenu()
 }
 
 // ——————— FONCTIONS D'AFFICHAGE ———————
-
 void updateMenuDisplay()
 {
     switch (currentScreen)
@@ -171,7 +166,7 @@ void updateMenuDisplay()
 
 void showMainDataScreen()
 {
-    showMainData(); // Utilise la fonction du DisplayManager
+    showMainData(); // Utilise la fonction du DisplayManager (pour l'instant, fake data)
 }
 
 void showMenuScreen()
@@ -247,7 +242,7 @@ void showCodeResultScreen()
         showMessage("CODE INCORRECT", "Acces refuse");
     }
 
-    if (millis() - resultTimer > MESSAGE_TIMEOUT)
+    if (millis() - resultTimer > MESSAGE_TIMEOUT) // 1500ms
     {
         if (codeSuccess)
             activateAdminMode();
@@ -334,7 +329,6 @@ bool isAdminMode()
 }
 
 // ——————— GESTION CODE ADMIN ———————
-
 void resetCodeInput()
 {
     codeDigits[0] = codeDigits[1] = codeDigits[2] = 0;
@@ -356,7 +350,6 @@ void checkAdminCode()
 }
 
 // ——————— ACTIONS MENU (STUBS) ———————
-
 void actionDisplayIds()
 {
     Serial.println("Action: Afficher ID batteries");
@@ -372,10 +365,27 @@ void actionIndividualBatteries()
     Serial.println("Action: Batteries individuelles");
 }
 
-void actionPairing()
+void actionPairing() //
 {
-    Serial.println("=== DÉBUT APPAIRAGE DES BATTERIES ===");
-    // Cette fonction sera appelée depuis le main avec accès aux fonctions Modbus
+    Serial.println("=== DÉBUT APPAIRAGE ===");
+
+    Serial.println("Étape 1: Envoi H=7 à toutes les batteries...");
+    showMessage("APPAIRAGE", "Afficher ID batteries...");
+    sendDisplayIdToAllBatteries(ASCII_7);
+    /*sendDisplayIdToBattery(1, ASCII_7);
+    delay(3000);
+    sendDisplayIdToBattery(3, ASCII_7);
+    delay(3000);
+    sendDisplayIdToBattery(2, ASCII_7);
+    Serial.println("Étape 2: Changement ID vers 1...");
+    showMessage("APPAIRAGE", "Reset ID batteries...");
+    delay(5000);*/
+    // TODO: changeAllBatteriesToId1();
+
+    Serial.println("Étape 3: etc...");
+    // TODO: autres étapes
+
+    Serial.println("=== APPAIRAGE TERMINÉ ===");
 }
 
 void actionSystemSettings()
@@ -384,7 +394,6 @@ void actionSystemSettings()
 }
 
 // ——————— GETTERS ———————
-
 int getCurrentScreen()
 {
     return currentScreen;
