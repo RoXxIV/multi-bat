@@ -134,6 +134,8 @@ bool readAllBatteriesData(ModbusDataType dataType = DATA_REALTIME);
 bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value);
 bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue);
 bool sendDisplayIdToAllBatteries(uint8_t asciiValue);
+bool changeBatteryIdTo1(uint8_t batteryId);
+bool changeAllBatteriesToId1();
 bool waitForAck(uint8_t batteryId, const char *operation);
 
 // Contrôles MOSFET

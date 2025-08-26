@@ -55,14 +55,13 @@ void loop()
   unsigned long now = millis();
 
   // ENVOI PÉRIODIQUE DES DONNÉES CAN
-  sendCanData();
-
+  // sendCanData();
   // Faire varier les consignes automatiquement
-  if (now - lastConsigneUpdate >= CONSIGNE_UPDATE_INTERVAL)
+  /*if (now - lastConsigneUpdate >= CONSIGNE_UPDATE_INTERVAL)
   {
     testVariableConsignes();
     lastConsigneUpdate = now;
-  }
+  }*/
 
   // Mettre à jour les boutons
   updateButtons();
@@ -96,7 +95,7 @@ void loop()
   }
 
   // Petite pause pour éviter la surcharge CPU
-  delay(10);
+  // delay(10);
 }
 
 // ——————— TEST DES CONSIGNES VARIABLES ———————

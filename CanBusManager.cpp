@@ -100,7 +100,7 @@ void sendCanData()
     {
         updateCanFrameDisplay();
     }
-    Serial.println("Trames CAN envoyées");
+    // Serial.println("Trames CAN envoyées");
 }
 
 // ——————— ENVOI DE TRAMES SPÉCIFIQUES ———————
@@ -132,8 +132,8 @@ void sendChargeLimits()
     canFrame.data[7] = 0x01;           // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    Serial.printf("CAN 0x351: V=51.6V, Ich=%.1fA, Idch=%.1fA\n",
-                  chargeCurrentSetpoint, dischargeCurrentSetpoint);
+    /*Serial.printf("CAN 0x351: V=51.6V, Ich=%.1fA, Idch=%.1fA\n",
+                  chargeCurrentSetpoint, dischargeCurrentSetpoint);*/
 }
 
 void sendSocSoh()
@@ -160,7 +160,7 @@ void sendSocSoh()
     canFrame.data[7] = 0x00;          // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    Serial.printf("CAN 0x355: SOC=%d%%, SOH=%d%%\n", soc, soh);
+    // Serial.printf("CAN 0x355: SOC=%d%%, SOH=%d%%\n", soc, soh);
 }
 
 void sendVoltageCurrentTemp()
@@ -190,8 +190,8 @@ void sendVoltageCurrentTemp()
     canFrame.data[7] = 0x00;              // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    Serial.printf("CAN 0x356: V=%.2fV, I=%.1fA, T=%.1f°C\n",
-                  voltage / 100.0, current / 100.0, temp / 10.0);
+    /*Serial.printf("CAN 0x356: V=%.2fV, I=%.1fA, T=%.1f°C\n",
+                  voltage / 100.0, current / 100.0, temp / 10.0);*/
 }
 
 void sendAlarms()
@@ -213,7 +213,7 @@ void sendAlarms()
     canFrame.data[7] = 0x00; // Réservé
 
     ESP32Can.writeFrame(canFrame);
-    Serial.println("CAN 0x359: Alarmes envoyées");
+    // Serial.println("CAN 0x359: Alarmes envoyées");
 }
 
 void sendRequests()
@@ -236,7 +236,7 @@ void sendRequests()
     canFrame.data[7] = 0x00; // Réservé
 
     ESP32Can.writeFrame(canFrame);
-    Serial.println("CAN 0x35C: Requêtes envoyées");
+    // Serial.println("CAN 0x35C: Requêtes envoyées");
 }
 
 // ——————— FONCTIONS D'AFFICHAGE DES TRAMES ———————
@@ -247,8 +247,8 @@ void updateCanFrameDisplay()
     uint16_t ichg = (uint16_t)(chargeCurrentSetpoint * 10);
     uint16_t idis = (uint16_t)(dischargeCurrentSetpoint * 10);
 
-    sprintf(lastCanFrames[0], "351: 04 02 %02X %02X %02X %02X C9 01",
-            lowByte(ichg), highByte(ichg), lowByte(idis), highByte(idis));
+    /*sprintf(lastCanFrames[0], "351: 04 02 %02X %02X %02X %02X C9 01",
+            lowByte(ichg), highByte(ichg), lowByte(idis), highByte(idis));*/
 
     strcpy(lastCanFrames[1], "355: 14 00 64 00 D0 07 00 00");
     strcpy(lastCanFrames[2], "356: 68 10 00 00 0E 01 00 00");

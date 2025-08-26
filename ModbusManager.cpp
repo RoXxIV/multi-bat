@@ -113,6 +113,7 @@ bool readBatteryData(uint8_t batteryId, ModbusDataType dataType)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    delay(10);
     enableRS485Receive(); // Repasser en mode réception
 
     // Attendre la réponse (timeout 500ms)
@@ -200,6 +201,7 @@ bool readBatteryParam(uint8_t batteryId, BatteryParam param)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    delay(10);
     enableRS485Receive();
 
     // Attendre réponse
@@ -261,6 +263,7 @@ bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
+    delay(10);
     enableRS485Receive();
 
     // Attendre l'ACK
@@ -593,6 +596,7 @@ bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, 16);
     modbusSerial->flush();
+    delay(10);
     enableRS485Receive();
 
     // Attendre l'ACK
@@ -609,6 +613,94 @@ bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
         Serial.printf("✗ Échec envoi ASCII=%d batterie ID=%d\n", asciiValue, batteryId);
         return false;
     }
+}
+
+bool changeBatteryIdTo1(uint8_t batteryId)
+{
+    if (!modbusSerial || batteryId < 1 || batteryId > MAX_BATTERIES)
+    {
+        Serial.println("ERREUR: Paramètres invalides pour changement ID");
+        return false;
+    }
+
+    Serial.printf("Changement ID batterie %d vers ID=1\n", batteryId);
+
+    // Construction de la trame pour changer l'ID vers 1
+    // Format similaire à sendDisplayIdToBattery mais pour un registre d'ID
+    sendBuffer[0] = 0x80 + batteryId; // Adresse avec correction
+    sendBuffer[1] = 0x06;             // Fonction écriture simple (0x06)
+    sendBuffer[2] = 0x01;             // Adresse registre ID (high) - À ajuster
+    sendBuffer[3] = 0x00;             // Adresse registre ID (low) - À ajuster
+    sendBuffer[4] = 0x00;             // Nouvelle valeur ID=1 (high)
+    sendBuffer[5] = 0x01;             // Nouvelle valeur ID=1 (low)
+
+    // Calculer le CRC sur les 6 premiers bytes
+    uint16_t crc = calculateCRC16(sendBuffer, 6);
+    sendBuffer[6] = crc & 0xFF;        // CRC low
+    sendBuffer[7] = (crc >> 8) & 0xFF; // CRC high
+
+    char label[40];
+    sprintf(label, "CHANGE_ID_%d_TO_1", batteryId);
+    printModbusBuffer(label, sendBuffer, 8);
+
+    // Vider le buffer de réception
+    while (modbusSerial->available())
+    {
+        modbusSerial->read();
+    }
+
+    // Envoi
+    enableRS485Transmit();
+    modbusSerial->write(sendBuffer, 8);
+    modbusSerial->flush();
+    delay(10);
+    enableRS485Receive();
+
+    // Attendre l'ACK
+    bool ackReceived = waitForAck(batteryId, label);
+
+    if (ackReceived)
+    {
+        Serial.printf("✓ ID batterie %d changé vers 1 et confirmé\n", batteryId);
+        return true;
+    }
+    else
+    {
+        Serial.printf("✗ Échec changement ID batterie %d vers 1\n", batteryId);
+        return false;
+    }
+}
+
+bool changeAllBatteriesToId1()
+{
+    Serial.println("=== CHANGEMENT TOUS IDs VERS 1 ===");
+
+    bool globalSuccess = true;
+
+    for (uint8_t batteryId = 1; batteryId <= MAX_BATTERIES; batteryId++)
+    {
+        Serial.printf("Tentative changement batterie ID=%d vers 1...\n", batteryId);
+
+        bool result = changeBatteryIdTo1(batteryId);
+        if (!result)
+        {
+            Serial.printf("Échec pour batterie ID=%d\n", batteryId);
+            globalSuccess = false;
+        }
+
+        delay(2000); // Délai entre chaque batterie
+    }
+
+    if (globalSuccess)
+    {
+        Serial.println("✓ Tous les changements d'ID terminés avec succès");
+    }
+    else
+    {
+        Serial.println("✗ Certains changements d'ID ont échoué");
+    }
+
+    return globalSuccess;
 }
 
 bool waitForAck(uint8_t batteryId, const char *operation)
@@ -630,6 +722,14 @@ bool waitForAck(uint8_t batteryId, const char *operation)
 
     if (responseLength > 0)
     {
+        // debut test
+        Serial.printf("DEBUG: Reçu %d bytes: ", responseLength);
+        for (int i = 0; i < responseLength; i++)
+        {
+            Serial.printf("%02X ", receiveBuffer[i]);
+        }
+        Serial.println();
+        // fin test
         char label[30];
         sprintf(label, "ACK_%s", operation);
         printModbusBuffer(label, receiveBuffer, responseLength);

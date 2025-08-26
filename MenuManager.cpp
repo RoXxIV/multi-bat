@@ -391,6 +391,15 @@ void actionPairing() //
     Serial.println("Étape 1: Envoi H=7 à toutes les batteries...");
     showMessage("APPAIRAGE", "Afficher ID batteries...");
     sendDisplayIdToAllBatteries(ASCII_7);
+    delay(2000);
+    Serial.println("Étape 2: Changement ID vers 1...");
+    showMessage("APPAIRAGE", "Reset ID batteries...");
+    changeAllBatteriesToId1();
+    delay(3000);
+    Serial.println("Étape 3: Deconexion des batteries...");
+    showMessage("APPAIRAGE", "Reset ID batteries...");
+    showMessage("APPAIRAGE", "Veuillez deconnecter toutes les batteries...");
+    delay(5000);
     /*sendDisplayIdToBattery(1, ASCII_7);
     delay(3000);
     sendDisplayIdToBattery(3, ASCII_7);
@@ -401,7 +410,7 @@ void actionPairing() //
     delay(5000);*/
     // TODO: changeAllBatteriesToId1();
 
-    Serial.println("Étape 3: etc...");
+    Serial.println("Étape X: etc...");
     // TODO: autres étapes
 
     Serial.println("=== APPAIRAGE TERMINÉ ===");
