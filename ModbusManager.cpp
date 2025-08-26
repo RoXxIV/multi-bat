@@ -1,5 +1,5 @@
 #include "ModbusManager.h"
-
+#include "DisplayManager.h"
 // ——————— VARIABLES GLOBALES ———————
 HardwareSerial *modbusSerial = nullptr;
 uint8_t sendBuffer[256];
@@ -16,8 +16,8 @@ void initModbus(HardwareSerial *serial)
 
     modbusSerial = serial;
     //  Attention : Utiliser SERIAL_8E1
-    modbusSerial->begin(BAUD_RATE, SERIAL_8E1, MODBUS_RX_PIN, MODBUS_TX_PIN);
-
+    // modbusSerial->begin(BAUD_RATE, SERIAL_8E1, MODBUS_RX_PIN, MODBUS_TX_PIN); //vvv
+    modbusSerial->begin(BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
     // Initialiser les buffers
     memset(sendBuffer, 0, sizeof(sendBuffer));
     memset(receiveBuffer, 0, sizeof(receiveBuffer));
@@ -113,7 +113,8 @@ bool readBatteryData(uint8_t batteryId, ModbusDataType dataType)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
-    delay(10);
+    // delay(10); vvv
+    delayMicroseconds(100);
     enableRS485Receive(); // Repasser en mode réception
 
     // Attendre la réponse (timeout 500ms)
@@ -201,7 +202,8 @@ bool readBatteryParam(uint8_t batteryId, BatteryParam param)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
-    delay(10);
+    // delay(10); vvv
+    delayMicroseconds(100);
     enableRS485Receive();
 
     // Attendre réponse
@@ -263,7 +265,8 @@ bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, frameLength);
     modbusSerial->flush();
-    delay(10);
+    // delay(10); vvv
+    delayMicroseconds(100);
     enableRS485Receive();
 
     // Attendre l'ACK
@@ -596,7 +599,8 @@ bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, 16);
     modbusSerial->flush();
-    delay(10);
+    // delay(10); vvv
+    delayMicroseconds(100);
     enableRS485Receive();
 
     // Attendre l'ACK
@@ -653,7 +657,8 @@ bool changeBatteryIdTo1(uint8_t batteryId)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, 8);
     modbusSerial->flush();
-    delay(10);
+    // delay(10);vvv
+    delayMicroseconds(100);
     enableRS485Receive();
 
     // Attendre l'ACK
@@ -703,7 +708,8 @@ bool changeBatteryIdFrom1To(uint8_t newId)
     enableRS485Transmit();
     modbusSerial->write(sendBuffer, 8);
     modbusSerial->flush();
-    delay(10);
+    // delay(10); vvv
+    delayMicroseconds(100);
     enableRS485Receive();
 
     bool ackReceived = waitForAck(1, label); // On attend l'ACK de l'ancienne adresse (1)
@@ -751,7 +757,7 @@ bool changeAllBatteriesToId1()
 
     return globalSuccess;
 }
-
+/*
 bool waitForAck(uint8_t batteryId, const char *operation)
 {
     unsigned long timeout = millis() + 200;
@@ -800,6 +806,147 @@ bool waitForAck(uint8_t batteryId, const char *operation)
         Serial.printf("✗ Timeout ACK batterie ID=%d pour %s\n", batteryId, operation);
     }
 
+    return false;
+}
+*/
+// Dans multi_bat/ModbusManager.cpp
+/*bool waitForAck(uint8_t batteryId, const char *operation)
+{
+    const int EXPECTED_LENGTH = 8;
+    uint8_t expectedAddr = 0x50 + batteryId;
+    unsigned long functionTimeout = millis() + 400;
+
+    // --- CORRECTION FINALE ---
+    // On réduit le timeout entre les octets à 5ms.
+    // C'est beaucoup plus strict et plus proche du standard Modbus RTU (3.5 * temps d'un caractère).
+    unsigned long interByteTimeout = 5;
+
+    while (modbusSerial->available())
+    {
+        modbusSerial->read();
+    }
+
+    while (millis() < functionTimeout)
+    {
+        int bytesRead = 0;
+        memset(receiveBuffer, 0, sizeof(receiveBuffer));
+        unsigned long lastByteTimestamp = millis();
+
+        while (millis() - lastByteTimestamp < interByteTimeout)
+        {
+            if (modbusSerial->available())
+            {
+                if (bytesRead < sizeof(receiveBuffer))
+                {
+                    receiveBuffer[bytesRead++] = modbusSerial->read();
+                    lastByteTimestamp = millis();
+                }
+                else
+                {
+                    modbusSerial->read();
+                }
+            }
+        }
+
+        if (bytesRead > 0)
+        {
+            Serial.printf("DEBUG: Trame candidate reçue [%d octets]: ", bytesRead);
+            for (int i = 0; i < bytesRead; i++)
+            {
+                Serial.printf("%02X ", receiveBuffer[i]);
+            }
+            Serial.println();
+
+            if (receiveBuffer[0] == expectedAddr && bytesRead == EXPECTED_LENGTH)
+            {
+                uint16_t receivedCrc = (receiveBuffer[bytesRead - 1] << 8) | receiveBuffer[bytesRead - 2];
+                uint16_t calculatedCrc = calculateCRC16(receiveBuffer, bytesRead - 2);
+
+                if (calculatedCrc == receivedCrc)
+                {
+                    Serial.printf("✓ ACK VALIDE et confirmé pour %s\n", operation);
+                    printModbusBuffer("ACK_VALIDE", receiveBuffer, bytesRead);
+                    return true;
+                }
+            }
+            Serial.println("INFO: Trame candidate rejetée (invalide ou non concernée). Recherche de la suivante...");
+        }
+    }
+
+    Serial.printf("✗ Timeout: Aucune trame ACK valide reçue pour %s\n", operation);
+    return false;
+}*/
+bool waitForAck(uint8_t batteryId, const char *operation)
+{
+    const uint8_t ADDR = 0x50 + batteryId;
+    const unsigned long T_DEADLINE = millis() + 400;
+    const unsigned long T_INTER = 12; // un peu plus large que 5 ms
+
+    static uint8_t buf[128];
+    int n = 0;
+    unsigned long lastByte = millis();
+
+    while (millis() < T_DEADLINE)
+    {
+        while (modbusSerial->available())
+        {
+            uint8_t b = modbusSerial->read();
+            lastByte = millis();
+            if (n < (int)sizeof(buf))
+                buf[n++] = b;
+
+            // --- recherche ACK FC06 ou FC10 (8 octets)
+            if (n >= 8)
+            {
+                for (int i = 0; i <= n - 8; ++i)
+                {
+                    if (buf[i] == ADDR && (buf[i + 1] == 0x06 || buf[i + 1] == 0x10))
+                    {
+                        uint16_t crc_calc = calculateCRC16(&buf[i], 6);
+                        uint16_t crc_recv = (uint16_t)buf[i + 6] | ((uint16_t)buf[i + 7] << 8);
+                        if (crc_calc == crc_recv)
+                        {
+                            char label[32];
+                            sprintf(label, "ACK_VALIDE_FC%02X", buf[i + 1]);
+                            printModbusBuffer(label, &buf[i], 8);
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // --- recherche “short-ACK” Daly (6 octets): addr 50 00 01 ??
+            if (n >= 6)
+            {
+                for (int i = 0; i <= n - 6; ++i)
+                {
+                    if (buf[i] == ADDR && buf[i + 1] == 0x50 && buf[i + 2] == 0x00 && buf[i + 3] == 0x01)
+                    {
+                        // Pas de vérif CRC : les 2 derniers octets ne sont pas CRC Modbus sur certains firmwares Daly.
+                        printModbusBuffer("ACK_VALIDE_SHORT", &buf[i], 6);
+                        return true;
+                    }
+                }
+            }
+
+            // garder la fin si le buffer sature
+            if (n > (int)sizeof(buf) - 16)
+            {
+                memmove(buf, &buf[n / 2], n - n / 2);
+                n -= n / 2;
+            }
+        }
+
+        if ((millis() - lastByte) > T_INTER && n > 0)
+        {
+            Serial.printf("DEBUG: Buffer brut [%d octets]: ", n);
+            for (int i = 0; i < n; i++)
+                Serial.printf("%02X ", buf[i]);
+            Serial.println();
+        }
+    }
+
+    Serial.printf("✗ Timeout: Aucune trame ACK valide reçue pour %s\n", operation);
     return false;
 }
 
