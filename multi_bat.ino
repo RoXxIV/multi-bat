@@ -1,3 +1,11 @@
+/*
+ * PROJET MULTIBATTERIE - Carte de gestion batteries lithium
+ *
+ * Permet de connecter jusqu'à 9 batteries individuelles à un onduleur
+ * via communication Modbus (batteries) et CAN Bus (onduleur)
+ *
+ * Hardware: ESP32 + écran OLED + 4 boutons + interface RS485
+ */
 #include <Wire.h>
 #include <U8g2lib.h>
 #include "Config.h"
@@ -7,29 +15,31 @@
 #include "ModbusManager.h"
 #include "CanBusManager.h"
 
-// ——————— OBJETS HARDWARE ———————
+// ——————— OBJETS MATÉRIELS ———————
+// Instance de l'écran OLED 128x64 I2C
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET);
 
 // ——————— VARIABLES DE TIMING ———————
-unsigned long lastDisplayUpdate = 0;
-unsigned long lastConsigneUpdate = 0;
-#define DISPLAY_UPDATE_INTERVAL 500   // Mettre à jour l'affichage toutes les 500ms
-#define CONSIGNE_UPDATE_INTERVAL 5000 // Changer les consignes toutes les 5s (pour test)
+unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence des mises à jour
+//  Intervalles de mise à jour
+#define DISPLAY_UPDATE_INTERVAL 500 // Rafraîchissement écran(ms)
 
-// ——————— SETUP ———————
+// ——————— INITIALISATION SYSTÈME ———————
 void setup()
 {
+  // Initialisation port série pour debug
   Serial.begin(115200);
   Serial.println("=== MULTI-BATTERIE avec CAN ===");
 
-  // Initialisation des modules
-  initDisplay(&u8g2);
+  initDisplay(&u8g2); // Initialisation de l'écran OLED
+
+  // Initialisation des boutons de navigation avec anti-rebond
   initButtons(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
   setDebounceDelay(DEBOUNCE_DELAY);
-  // Initialisation du Modbus
-  initModbus(&MODBUS_SERIAL);
 
-  // Initialisation du CAN Bus
+  initModbus(&MODBUS_SERIAL); // Initialisation de la communication Modbus RS485 avec les batteries
+
+  // Initialisation du bus CAN pour communication avec l'onduleur
   if (!initCanBus())
   {
     Serial.println("ERREUR: Impossible d'initialiser le CAN!");
@@ -37,133 +47,66 @@ void setup()
     delay(2000);
   }
 
-  initMenu();
+  initMenu(); // Initialisation du système de menus
 
-  // Consignes initiales temporaire
-  setChargeCurrentSetpoint(10.0);    // 10A comme sur le doc
-  setDischargeCurrentSetpoint(10.0); // 10A comme sur le doc
+  // Configuration initiale des consignes de courant
+  setChargeCurrentSetpoint(10.0);    // 10A charge par défaut
+  setDischargeCurrentSetpoint(10.0); // 10A décharge par défaut
 
+  // Message de démarrage
   Serial.println("Système prêt !");
   Serial.println("Consignes variables: 0-600A pour charge/décharge");
   showMessage("SYSTEME", "Pret ! CAN actif");
   delay(1000);
 }
 
-// ——————— LOOP PRINCIPAL ———————
+// ——————— BOUCLE PRINCIPALE ———————
 void loop()
 {
   unsigned long now = millis();
 
-  // ENVOI PÉRIODIQUE DES DONNÉES CAN
-  // sendCanData();
-  // Faire varier les consignes automatiquement
-  /*if (now - lastConsigneUpdate >= CONSIGNE_UPDATE_INTERVAL)
-  {
-    testVariableConsignes();
-    lastConsigneUpdate = now;
-  }*/
+  updateButtons(); // Mise à jour de l'état de tous les boutons (anti-rebond inclus)
 
-  // Mettre à jour les boutons
-  updateButtons();
+  handleButtonEvents(); // Traitement des événements boutons
 
-  // Traiter les appuis de boutons
-  if (isUpPressed())
-  {
-    navigateMenuUp();
-  }
-
-  if (isDownPressed())
-  {
-    navigateMenuDown();
-  }
-
-  if (isOkPressed())
-  {
-    handleOkButton();
-  }
-
-  if (isBackPressed())
-  {
-    goBackMenu();
-  }
-
-  // Mettre à jour l'affichage (moins fréquent pour éviter le scintillement)
+  // Mise à jour de l'affichage à intervalles réguliers
   if (now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL)
   {
     updateMenuDisplay();
     lastDisplayUpdate = now;
   }
-
-  // Petite pause pour éviter la surcharge CPU
-  // delay(10);
 }
 
-// ——————— TEST DES CONSIGNES VARIABLES ———————
-/*
-avec mode dégradé : 10/10
-Seconde 0  : "Limite charge=10A, décharge=10A"    ← Très restrictif
-Seconde 5  : "Limite charge=50A, décharge=100A"
-Seconde 10 : "Limite charge=200A, décharge=300A"
-Seconde 15 : "Limite charge=500A, décharge=600A"  ← Limite MAX
-Seconde 20 : "Limite charge=0A, décharge=0A"      ← STOP complet !
-Seconde 25 : "Limite charge=347A, décharge=82A"   ← Aléatoire
-Seconde 30 : "Limite charge=156A, décharge=423A"  ← Aléatoire
-Seconde 35 : "Limite charge=10A, décharge=10A"    ← Retour au début
-*/
-void testVariableConsignes()
+// ——————— GESTION DES ÉVÉNEMENTS BOUTONS ———————
+void handleButtonEvents()
 {
-  static int testStep = 0;
-
-  switch (testStep)
+  // Navigation vers le haut (menu, code admin, etc.)
+  if (isUpPressed())
   {
-  case 0:
-    setChargeCurrentSetpoint(10.0);
-    setDischargeCurrentSetpoint(10.0);
-    Serial.println("TEST: Consignes 10A/10A");
-    break;
-  case 1:
-    setChargeCurrentSetpoint(50.0);
-    setDischargeCurrentSetpoint(100.0);
-    Serial.println("TEST: Consignes 50A/100A");
-    break;
-  case 2:
-    setChargeCurrentSetpoint(200.0);
-    setDischargeCurrentSetpoint(300.0);
-    Serial.println("TEST: Consignes 200A/300A");
-    break;
-  case 3:
-    setChargeCurrentSetpoint(500.0);
-    setDischargeCurrentSetpoint(600.0);
-    Serial.println("TEST: Consignes 500A/600A (MAX)");
-    break;
-  case 4:
-    setChargeCurrentSetpoint(0.0);
-    setDischargeCurrentSetpoint(0.0);
-    Serial.println("TEST: Consignes 0A/0A (STOP)");
-    break;
-  default:
-    // Consignes aléatoires
-    float randomCharge = random(0, 601);    // 0-600A
-    float randomDischarge = random(0, 601); // 0-600A
-    setChargeCurrentSetpoint(randomCharge);
-    setDischargeCurrentSetpoint(randomDischarge);
-    Serial.printf("TEST: Consignes aléatoires %.0fA/%.0fA\n", randomCharge, randomDischarge);
-    break;
+    navigateMenuUp();
   }
 
-  testStep++;
-  if (testStep > 8)
-    testStep = 0; // Boucle de test
-}
+  // Navigation vers le bas
+  if (isDownPressed())
+  {
+    navigateMenuDown();
+  }
 
-// ——————— GESTION BOUTON OK ———————
-void handleOkButton()
-{
-  // Action normale du menu (gère l'écran principal → menu)
-  selectMenuItem();
+  // Validation/sélection
+  if (isOkPressed())
+  {
+    selectMenuItem(); // Gère automatiquement le contexte (menu, écran principal, etc.)
+  }
+
+  // Retour/annulation
+  if (isBackPressed())
+  {
+    goBackMenu();
+  }
 }
 
 // ——————— FONCTIONS UTILITAIRES ———————
+// Affiche l'état système sur le port série (pour debug)
 void printSystemStatus()
 {
   Serial.println("\n=== STATUS SYSTÈME ===");

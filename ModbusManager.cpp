@@ -671,6 +671,55 @@ bool changeBatteryIdTo1(uint8_t batteryId)
     }
 }
 
+bool changeBatteryIdFrom1To(uint8_t newId)
+{
+    if (!modbusSerial || newId < 2 || newId > 9)
+    {
+        Serial.println("ERREUR: Paramètres invalides pour changement ID");
+        return false;
+    }
+
+    Serial.printf("Changement batterie ID=1 vers ID=%d\n", newId);
+
+    // Construction de la trame (même logique que changeBatteryIdTo1)
+    sendBuffer[0] = 0x81;  // Adresse maître
+    sendBuffer[1] = 0x06;  // Fonction écriture simple
+    sendBuffer[2] = 0x01;  // Adresse registre ID (high) - À ajuster selon votre doc
+    sendBuffer[3] = 0x00;  // Adresse registre ID (low) - À ajuster selon votre doc
+    sendBuffer[4] = 0x00;  // Nouvelle valeur ID (high)
+    sendBuffer[5] = newId; // Nouvelle valeur ID (low)
+
+    uint16_t crc = calculateCRC16(sendBuffer, 6);
+    sendBuffer[6] = crc & 0xFF;
+    sendBuffer[7] = (crc >> 8) & 0xFF;
+
+    char label[40];
+    sprintf(label, "CHANGE_ID_1_TO_%d", newId);
+    printModbusBuffer(label, sendBuffer, 8);
+
+    while (modbusSerial->available())
+        modbusSerial->read();
+
+    enableRS485Transmit();
+    modbusSerial->write(sendBuffer, 8);
+    modbusSerial->flush();
+    delay(10);
+    enableRS485Receive();
+
+    bool ackReceived = waitForAck(1, label); // On attend l'ACK de l'ancienne adresse (1)
+
+    if (ackReceived)
+    {
+        Serial.printf("✓ Batterie changée de ID=1 vers ID=%d\n", newId);
+        return true;
+    }
+    else
+    {
+        Serial.printf("✗ Échec changement ID=1 vers ID=%d\n", newId);
+        return false;
+    }
+}
+
 bool changeAllBatteriesToId1()
 {
     Serial.println("=== CHANGEMENT TOUS IDs VERS 1 ===");

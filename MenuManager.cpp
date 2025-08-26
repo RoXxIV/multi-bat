@@ -1,5 +1,6 @@
 #include "MenuManager.h"
 #include "CanBusManager.h"
+#include "ButtonManager.h"
 
 // ——————— VARIABLES GLOBALES ———————
 int currentScreen = SCREEN_MAIN_DATA;
@@ -384,38 +385,6 @@ void actionIndividualBatteries()
     Serial.println("Action: Batteries individuelles");
 }
 
-void actionPairing() //
-{
-    Serial.println("=== DÉBUT APPAIRAGE ===");
-
-    Serial.println("Étape 1: Envoi H=7 à toutes les batteries...");
-    showMessage("APPAIRAGE", "Afficher ID batteries...");
-    sendDisplayIdToAllBatteries(ASCII_7);
-    delay(2000);
-    Serial.println("Étape 2: Changement ID vers 1...");
-    showMessage("APPAIRAGE", "Reset ID batteries...");
-    changeAllBatteriesToId1();
-    delay(3000);
-    Serial.println("Étape 3: Deconexion des batteries...");
-    showMessage("APPAIRAGE", "Reset ID batteries...");
-    showMessage("APPAIRAGE", "Veuillez deconnecter toutes les batteries...");
-    delay(5000);
-    /*sendDisplayIdToBattery(1, ASCII_7);
-    delay(3000);
-    sendDisplayIdToBattery(3, ASCII_7);
-    delay(3000);
-    sendDisplayIdToBattery(2, ASCII_7);
-    Serial.println("Étape 2: Changement ID vers 1...");
-    showMessage("APPAIRAGE", "Reset ID batteries...");
-    delay(5000);*/
-    // TODO: changeAllBatteriesToId1();
-
-    Serial.println("Étape X: etc...");
-    // TODO: autres étapes
-
-    Serial.println("=== APPAIRAGE TERMINÉ ===");
-}
-
 void actionSystemSettings()
 {
     Serial.println("Action: Parametres systeme (ADMIN)");
@@ -428,6 +397,257 @@ void actionShowCanFrames()
     setCanDisplayActive(true);
     currentScreen = SCREEN_CAN_FRAMES; // ⭐ CRUCIAL: changer l'écran
     Serial.printf("DEBUG: currentScreen = %d\n", currentScreen);
+}
+
+// ——————— APPAIRAGE DES BATTERIES ———————
+void actionPairing() //
+{
+    Serial.println("=== DÉBUT APPAIRAGE ===");
+
+    // Étape 1: Reset tous les IDs à 1
+    Serial.println("Étape 1: Reset ID batteries vers 1...");
+    showMessage("APPAIRAGE", "Reset ID batteries...");
+    changeAllBatteriesToId1();
+    delay(2000);
+
+    // Étape 2: Demander déconnexion
+    Serial.println("Étape 2: Déconnexion des batteries...");
+    waitForUserConfirmation("APPAIRAGE", "Deconnectez toutes les", "batteries puis appuyez", "sur OK pour continuer");
+
+    // Étape 3: Appairage séquentiel avec menu
+    Serial.println("Étape 3: Appairage séquentiel...");
+    sequentialPairingWithMenu();
+
+    Serial.println("=== APPAIRAGE TERMINÉ ===");
+}
+
+void waitForUserConfirmation(const char *title, const char *line1, const char *line2, const char *line3)
+{
+    Serial.printf("Attente confirmation utilisateur: %s\n", title);
+
+    bool waiting = true;
+    unsigned long lastUpdate = 0;
+
+    while (waiting)
+    {
+        // Mettre à jour les boutons
+        updateButtons();
+
+        // Vérifier si OK est pressé
+        if (isOkPressed())
+        {
+            waiting = false;
+            Serial.println("Utilisateur a confirmé avec OK");
+            break;
+        }
+
+        // Mettre à jour l'affichage (moins fréquent pour éviter scintillement)
+        if (millis() - lastUpdate >= 200)
+        {
+            clearDisplay();
+            drawTitle(title);
+
+            // Afficher les lignes de texte
+            if (line1)
+                drawText(5, 25, line1);
+            if (line2)
+                drawText(5, 35, line2);
+            if (line3)
+                drawText(5, 45, line3);
+
+            // Instructions
+            drawText(5, 60, "OK: continuer", false, false);
+
+            showDisplay();
+            lastUpdate = millis();
+        }
+
+        // Petite pause pour éviter surcharge CPU
+        delay(10);
+    }
+}
+// Nouvelle fonction d'appairage avec menu
+void sequentialPairingWithMenu()
+{
+    int currentBatteryNumber = 1;
+    int batteriesConfigured = 0;
+    bool continuePairing = true;
+
+    while (continuePairing)
+    {
+        // Demander de brancher la batterie
+        char title[20];
+        sprintf(title, "BATTERIE #%d", currentBatteryNumber);
+
+        char instruction[30];
+        sprintf(instruction, "Brancher batterie #%d", currentBatteryNumber);
+
+        waitForUserConfirmation(title, instruction, "puis appuyez sur OK", "pour confirmer");
+
+        // Processus de configuration
+        Serial.printf("Configuration batterie #%d...\n", currentBatteryNumber);
+        showMessage("EN COURS", "Configuration...");
+
+        int newId = currentBatteryNumber + 1; // ID 2, 3, 4, etc.
+        bool success = configureBattery(newId);
+
+        if (success)
+        {
+            batteriesConfigured++;
+            showMessage("SUCCES", "Batterie configuree");
+            delay(1500);
+
+            // Menu de choix
+            PairingChoice choice = showPairingMenu(batteriesConfigured);
+
+            if (choice == CHOICE_ADD_BATTERY)
+            {
+                currentBatteryNumber++;
+                if (currentBatteryNumber > 8) // Max 8 batteries
+                {
+                    showMessage("LIMITE", "Max 8 batteries");
+                    delay(2000);
+                    continuePairing = false;
+                }
+            }
+            else // CHOICE_FINISH
+            {
+                continuePairing = false;
+            }
+        }
+        else
+        {
+            showMessage("ERREUR", "Echec configuration");
+            delay(2000);
+
+            // En cas d'erreur, proposer de réessayer ou terminer
+            PairingChoice choice = showErrorMenu();
+            if (choice == CHOICE_FINISH)
+            {
+                continuePairing = false;
+            }
+            // Si CHOICE_ADD_BATTERY, on réessaie avec la même batterie
+        }
+    }
+
+    // Affichage final
+    char finalMsg[30];
+    sprintf(finalMsg, "%d batteries config.", batteriesConfigured);
+    waitForUserConfirmation("TERMINE", finalMsg, "Appuyez sur OK", "pour retourner au menu");
+}
+
+// Fonction pour configurer une batterie (ID + H7)
+bool configureBattery(int newId)
+{
+    // Changer ID de 1 vers newId
+    bool idChanged = changeBatteryIdFrom1To(newId);
+
+    if (idChanged)
+    {
+        // Envoyer H=7 pour affichage
+        sendDisplayIdToBattery(newId, ASCII_7);
+        return true;
+    }
+
+    return false;
+}
+
+// Menu après configuration réussie
+PairingChoice showPairingMenu(int batteriesCount)
+{
+    int selectedOption = 0;
+    bool menuActive = true;
+    unsigned long lastUpdate = 0;
+
+    while (menuActive)
+    {
+        updateButtons();
+
+        // Navigation
+        if (isUpPressed())
+        {
+            selectedOption = (selectedOption - 1 + 2) % 2;
+        }
+        if (isDownPressed())
+        {
+            selectedOption = (selectedOption + 1) % 2;
+        }
+        if (isOkPressed())
+        {
+            return (selectedOption == 0) ? CHOICE_ADD_BATTERY : CHOICE_FINISH;
+        }
+
+        // Affichage
+        if (millis() - lastUpdate >= 200)
+        {
+            clearDisplay();
+            drawTitle("CHOIX");
+
+            char status[25];
+            sprintf(status, "%d batteries config.", batteriesCount);
+            drawText(5, 20, status, false, false);
+
+            // Options de menu
+            drawText(10, 35, "Ajouter batterie", false, selectedOption == 0);
+            drawText(10, 45, "Terminer", false, selectedOption == 1);
+
+            // Curseur
+            drawText(2, selectedOption == 0 ? 35 : 45, ">", false, false);
+
+            showDisplay();
+            lastUpdate = millis();
+        }
+
+        delay(10);
+    }
+
+    return CHOICE_FINISH;
+}
+
+// Menu en cas d'erreur
+PairingChoice showErrorMenu()
+{
+    int selectedOption = 0;
+    bool menuActive = true;
+    unsigned long lastUpdate = 0;
+
+    while (menuActive)
+    {
+        updateButtons();
+
+        if (isUpPressed())
+        {
+            selectedOption = (selectedOption - 1 + 2) % 2;
+        }
+        if (isDownPressed())
+        {
+            selectedOption = (selectedOption + 1) % 2;
+        }
+        if (isOkPressed())
+        {
+            return (selectedOption == 0) ? CHOICE_ADD_BATTERY : CHOICE_FINISH;
+        }
+
+        if (millis() - lastUpdate >= 200)
+        {
+            clearDisplay();
+            drawTitle("ERREUR CONFIG");
+
+            drawText(5, 25, "Configuration echec", false, false);
+
+            drawText(10, 35, "Reessayer", false, selectedOption == 0);
+            drawText(10, 45, "Terminer", false, selectedOption == 1);
+
+            drawText(2, selectedOption == 0 ? 35 : 45, ">", false, false);
+
+            showDisplay();
+            lastUpdate = millis();
+        }
+
+        delay(10);
+    }
+
+    return CHOICE_FINISH;
 }
 // ——————— GETTERS ———————
 int getCurrentScreen()
