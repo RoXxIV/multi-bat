@@ -102,7 +102,7 @@ void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatter
                 // On décode chaque valeur en utilisant son offset par rapport à l'adresse de début (0x38).
                 totalVoltage += ((data[0] << 8) | data[1]) / 10.0f;
                 totalCurrent += (((int16_t)((data[2] << 8) | data[3])) - 30000) * 0.1f;
-                totalSoc += ((data[4] << 8) | data[5]) * 0.001f;
+                totalSoc += ((data[4] << 8) | data[5]) / 10.0f;
 
                 const int tempOffset = (REG_MOS_TEMP - REG_TOTAL_VOLTAGE) * 2;
                 totalTemp += (((data[tempOffset] << 8) | data[tempOffset + 1])) - 40.0f;

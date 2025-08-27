@@ -48,14 +48,6 @@ void setup()
 
   initModbus(&MODBUS_SERIAL); // Initialisation de la communication Modbus RS485 avec les batteries
 
-  // Initialisation du bus CAN pour communication avec l'onduleur
-  if (!initCanBus())
-  {
-    Serial.println("ERREUR: Impossible d'initialiser le CAN!");
-    showMessage("ERREUR", "Echec init CAN");
-    delay(2000);
-  }
-
   initMenu(); // Initialisation du système de menus
 
   // Si aucune batterie n'est configurée (premier démarrage),
@@ -72,15 +64,10 @@ void setup()
     Serial.printf("INFO: Appairage terminé. %d batterie(s) maintenant configurée(s).\n", configuredBatteryCount);
   }
 
-  // Configuration initiale des consignes de courant
-  setChargeCurrentSetpoint(10.0);    // 10A charge par défaut
-  setDischargeCurrentSetpoint(10.0); // 10A décharge par défaut
-
   // Message de démarrage
   Serial.println("Système prêt !");
-  Serial.println("Consignes variables: 0-600A pour charge/décharge");
-  showMessage("SYSTEME", "Pret ! CAN actif");
-  delay(1000);
+  showMessage("BIENVENUE", "Démarrage");
+  delay(1500);
 }
 
 // ——————— BOUCLE PRINCIPALE ———————

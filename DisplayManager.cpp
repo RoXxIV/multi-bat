@@ -95,7 +95,7 @@ void showMainData()
     // --- BLOC DE DÉBOGAGE ---
     // On ajoute un log pour voir quelle valeur la fonction d'affichage est en train de lire.
     // Le "(int)" convertit le booléen 'true'/'false' en '1'/'0' pour l'affichage.
-    Serial.printf("[DISPLAY] Appel de showMainData. isDataValid = %d\n", (int)latestMetrics.isDataValid);
+    // Serial.printf("[DISPLAY] Appel de showMainData. isDataValid = %d\n", (int)latestMetrics.isDataValid);
     // --- FIN DU BLOC DE DÉBOGAGE ---
 
     // --- Début de la modification ---
