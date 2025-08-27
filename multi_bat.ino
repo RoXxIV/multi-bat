@@ -25,6 +25,10 @@ unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence
 //  Intervalles de mise à jour
 #define DISPLAY_UPDATE_INTERVAL 500 // Rafraîchissement écran(ms)
 
+unsigned long lastMetricsUpdate = 0;
+const long METRICS_UPDATE_INTERVAL = 10000; // 10 secondes
+AggregateBatteryMetrics latestMetrics;
+
 int configuredBatteryCount = 0; // Nombre de batteries configurées par l'utilisateur
 // ——————— INITIALISATION SYSTÈME ———————
 void setup()
@@ -93,6 +97,17 @@ void loop()
   {
     updateMenuDisplay();
     lastDisplayUpdate = now;
+  }
+
+  // Mise à jour des données globales des batteries
+  if (now - lastMetricsUpdate >= METRICS_UPDATE_INTERVAL)
+  {
+    lastMetricsUpdate = now;
+    // On appelle la nouvelle fonction avec le nombre de batteries sauvegardé en NVS
+    readAggregateBatteryMetrics(configuredBatteryCount, &latestMetrics);
+
+    // Vous pouvez maintenant utiliser `latestMetrics.averageSoc`, etc.
+    // pour mettre à jour l'écran ou envoyer des trames CAN.
   }
 }
 

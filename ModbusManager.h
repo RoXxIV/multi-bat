@@ -4,6 +4,16 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include "Config.h"
+// ——————— DONNÉES DES BATTERIES ———————
+// Structure pour stocker les données consolidées de l'ensemble du parc de batteries.
+struct AggregateBatteryMetrics
+{
+    float averageSoc;     // SOC moyen de toutes les batteries
+    float averageVoltage; // Tension moyenne
+    float totalCurrent;   // Courant total (somme des courants)
+    float averageTemp;    // Température moyenne des MOSFETs
+    bool isDataValid;     // Indique si les données sont fiables
+};
 
 // ——————— CONSTANTES MODBUS ———————
 // Paramètres de communication
@@ -125,6 +135,8 @@ bool readBatteryData(uint8_t batteryId, ModbusDataType dataType = DATA_REALTIME)
 bool readBatteryParam(uint8_t batteryId, BatteryParam param);
 // Lit les données de toutes les batteries connectées (scan complet)
 bool readAllBatteriesData(ModbusDataType dataType = DATA_REALTIME);
+bool readMainBatteryMetrics(uint8_t batteryId);
+void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatteryMetrics *metrics);
 
 // ——————— FONCTIONS D'ÉCRITURE ———————
 // Écrit une valeur dans un registre spécifique d'une batterie

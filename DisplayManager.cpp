@@ -1,7 +1,9 @@
 #include "DisplayManager.h"
-
+#include "ModbusManager.h"
+#include "CanBusManager.h"
 // ——————— VARIABLE GLOBALE ———————
 U8G2 *display_u8g2 = nullptr;
+extern AggregateBatteryMetrics latestMetrics;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initDisplay(U8G2 *u8g2_ptr)
@@ -90,37 +92,58 @@ void showMainData()
 {
     clearDisplay();
 
-    // Données fictives pour test
-    float soc = 75.5;              // %
-    float voltage = 51.2;          // V
-    float current = -12.3;         // A (négatif = charge)
-    float chargeSetpoint = 450;    // A
-    float dischargeSetpoint = 600; // A
-    float avgTemp = 23.4;          // °C
+    // --- BLOC DE DÉBOGAGE ---
+    // On ajoute un log pour voir quelle valeur la fonction d'affichage est en train de lire.
+    // Le "(int)" convertit le booléen 'true'/'false' en '1'/'0' pour l'affichage.
+    Serial.printf("[DISPLAY] Appel de showMainData. isDataValid = %d\n", (int)latestMetrics.isDataValid);
+    // --- FIN DU BLOC DE DÉBOGAGE ---
 
-    // Ligne 1 : SOC et Tension
-    char line[32];
-    sprintf(line, "SOC:%.1f%%", soc);
-    drawText(5, 12, line);
+    // --- Début de la modification ---
 
-    sprintf(line, "V:%.1fV", voltage);
-    drawText(70, 12, line);
+    // Vérifie d'abord si les données des batteries sont valides.
+    if (latestMetrics.isDataValid)
+    {
+        // Si les données sont valides, on les affiche.
+        float soc = latestMetrics.averageSoc;
+        float voltage = latestMetrics.averageVoltage;
+        float current = latestMetrics.totalCurrent;
+        float avgTemp = latestMetrics.averageTemp;
 
-    // Ligne 2 : Intensité et Température
-    sprintf(line, "I:%.1fA", current);
-    drawText(5, 22, line);
+        // On récupère les consignes actuelles directement depuis le CanBusManager.
+        float chargeSetpoint = getChargeCurrentSetpoint();
+        float dischargeSetpoint = getDischargeCurrentSetpoint();
 
-    sprintf(line, "Temp:%.1fC", avgTemp);
-    drawText(70, 22, line);
+        char line[32]; // Buffer pour formater le texte à afficher
 
-    // Ligne 3 : Consignes
-    sprintf(line, "Ch:%dA", (int)chargeSetpoint);
-    drawText(5, 32, line);
+        // Ligne 1 : SOC et Tension
+        sprintf(line, "SOC:%.1f%%", soc);
+        drawText(5, 12, line);
+        sprintf(line, "V:%.1fV", voltage);
+        drawText(70, 12, line);
 
-    sprintf(line, "Dch:%dA", (int)dischargeSetpoint);
-    drawText(70, 32, line);
+        // Ligne 2 : Intensité et Température
+        sprintf(line, "I:%.1fA", current);
+        drawText(5, 22, line);
+        sprintf(line, "Temp:%.1fC", avgTemp);
+        drawText(70, 22, line);
 
-    // Ligne 5 : Boutons
+        // Ligne 3 : Consignes de charge et décharge
+        sprintf(line, "Ch:%dA", (int)chargeSetpoint);
+        drawText(5, 32, line);
+        sprintf(line, "Dch:%dA", (int)dischargeSetpoint);
+        drawText(70, 32, line);
+    }
+    else
+    {
+        // Si les données ne sont pas encore valides (ex: au premier démarrage),
+        // on affiche un message d'attente.
+        drawText(5, 25, "En attente des");
+        drawText(5, 35, "donnees batteries...");
+    }
+
+    // --- Fin de la modification ---
+
+    // Ligne 5 : Boutons (inchangée)
     drawText(5, 55, "R:N/A");
     drawText(80, 55, "OK:menu");
 
