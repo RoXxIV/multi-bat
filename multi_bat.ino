@@ -54,6 +54,20 @@ void setup()
 
   initMenu(); // Initialisation du système de menus
 
+  // Si aucune batterie n'est configurée (premier démarrage),
+  // on lance directement le processus d'appairage.
+  if (configuredBatteryCount == 0)
+  {
+    Serial.println("INFO: Aucune batterie configurée. Lancement de l'appairage initial...");
+    showMessage("BIENVENUE", "Config. initiale");
+    delay(2000);
+    actionPairing(); // On appelle directement la fonction d'appairage
+
+    // Après l'appairage, on recharge le nombre de batteries pour être à jour
+    configuredBatteryCount = loadBatteryCount();
+    Serial.printf("INFO: Appairage terminé. %d batterie(s) maintenant configurée(s).\n", configuredBatteryCount);
+  }
+
   // Configuration initiale des consignes de courant
   setChargeCurrentSetpoint(10.0);    // 10A charge par défaut
   setDischargeCurrentSetpoint(10.0); // 10A décharge par défaut
