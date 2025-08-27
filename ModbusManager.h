@@ -131,8 +131,6 @@ bool readAllBatteriesData(ModbusDataType dataType = DATA_REALTIME);
 bool writeBatteryParam(uint8_t batteryId, uint16_t regAddr, uint16_t value);
 // Envoie commande d'affichage H=7 à une batterie spécifique
 bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue);
-// Envoie commande d'affichage H=7 à toutes les batteries
-bool sendDisplayIdToAllBatteries(uint8_t asciiValue);
 // Change l'ID d'une batterie vers ID=1 (utilisé avant appairage)
 bool changeBatteryIdTo1(uint8_t batteryId);
 // Change l'ID de toutes les batteries vers 1 (reset complet)

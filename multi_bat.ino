@@ -14,6 +14,7 @@
 #include "ButtonManager.h"
 #include "ModbusManager.h"
 #include "CanBusManager.h"
+#include "NvsManager.h"
 
 // ——————— OBJETS MATÉRIELS ———————
 // Instance de l'écran OLED 128x64 I2C
@@ -24,12 +25,16 @@ unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence
 //  Intervalles de mise à jour
 #define DISPLAY_UPDATE_INTERVAL 500 // Rafraîchissement écran(ms)
 
+int configuredBatteryCount = 0; // Nombre de batteries configurées par l'utilisateur
 // ——————— INITIALISATION SYSTÈME ———————
 void setup()
 {
   // Initialisation port série pour debug
   Serial.begin(115200);
   Serial.println("=== MULTI-BATTERIE avec CAN ===");
+  initNvs();                                   // Initialisation de la NVS
+  configuredBatteryCount = loadBatteryCount(); // Chargement du nombre de batteries configurées
+  Serial.printf("INFO: %d batterie(s) configurée(s) au démarrage.\n", configuredBatteryCount);
 
   initDisplay(&u8g2); // Initialisation de l'écran OLED
 

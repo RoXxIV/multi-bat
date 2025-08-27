@@ -67,6 +67,7 @@ void actionShowCanFrames();       // Active l'affichage temps réel des trames C
 void actionPairing();                              // Lance le processus complet d'appairage des batteries
 void sequentialPairingWithMenu();                  // Gère l'appairage séquentiel avec menus de choix
 bool configureBattery(int newId);                  // Configure une batterie (change ID de 1 vers newId et envoie H=7)
+void finalizePairing(int batteriesConfigured);     // Finalise l'appairage des batteries (change H=7 vers H=4)
 PairingChoice showPairingMenu(int batteriesCount); // Affiche le menu de choix après configuration réussie
 PairingChoice showErrorMenu();                     // Affiche le menu en cas d'erreur de configuration
 // Affiche un message et attend confirmation OK de l'utilisateur

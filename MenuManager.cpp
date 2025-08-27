@@ -1,6 +1,7 @@
 #include "MenuManager.h"
 #include "CanBusManager.h"
 #include "ButtonManager.h"
+#include "NvsManager.h"
 
 // ——————— VARIABLES GLOBALES ———————
 int currentScreen = SCREEN_MAIN_DATA;
@@ -466,7 +467,7 @@ void waitForUserConfirmation(const char *title, const char *line1, const char *l
         delay(10);
     }
 }
-// Nouvelle fonction d'appairage avec menu
+
 void sequentialPairingWithMenu()
 {
     int currentBatteryNumber = 1;
@@ -512,6 +513,8 @@ void sequentialPairingWithMenu()
             }
             else // CHOICE_FINISH
             {
+                // L'utilisateur a choisi de terminer, on lance la finalisation. h4
+                finalizePairing(batteriesConfigured);
                 continuePairing = false;
             }
         }
@@ -552,6 +555,36 @@ bool configureBattery(int newId)
     return false;
 }
 
+void finalizePairing(int batteriesConfigured)
+{
+    if (batteriesConfigured <= 0)
+        return; // Ne fait rien si aucune batterie n'a été configurée
+
+    Serial.println("=== FINALISATION APPAIRAGE ===");
+    showMessage("FINALISATION", "Configuration H4...");
+
+    // La valeur à envoyer est toujours '4' (H4), ce qui correspond à l'ASCII 0x34.
+    const uint8_t asciiValueToSend = '4';
+
+    // Boucle sur toutes les batteries qui viennent d'être appairées.
+    // Les ID commencent à 2 et vont jusqu'au nombre de batteries configurées + 1.
+    for (int id = 2; id <= batteriesConfigured + 1; id++)
+    {
+        Serial.printf("Envoi H4 (ASCII 0x%02X) à la batterie ID=%d\n", asciiValueToSend, id);
+
+        // Envoie la commande H4 à la batterie avec son nouvel ID.
+        // La fonction sendDisplayIdToBattery construit déjà la bonne trame (ex: 82... pour ID=2, 83... pour ID=3)
+        sendDisplayIdToBattery(id, asciiValueToSend);
+
+        // Petite pause pour ne pas surcharger le bus Modbus
+        delay(500);
+        saveBatteryCount(batteriesConfigured);
+        showMessage("SUCCES", "Configuration OK !");
+        delay(2000);
+    }
+
+    Serial.println("=== FINALISATION TERMINEE ===");
+}
 // Menu après configuration réussie
 PairingChoice showPairingMenu(int batteriesCount)
 {
