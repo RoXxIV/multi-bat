@@ -3,6 +3,7 @@
 #include "CanBusManager.h"
 // ——————— VARIABLE GLOBALE ———————
 U8G2 *display_u8g2 = nullptr;
+bool isScreenOn = true; // vvv
 extern AggregateBatteryMetrics latestMetrics;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
@@ -11,6 +12,7 @@ void initDisplay(U8G2 *u8g2_ptr)
     display_u8g2 = u8g2_ptr;
     display_u8g2->begin();
     display_u8g2->setFont(u8g2_font_6x10_tf);
+    turnOnDisplay(); // vvv
     clearDisplay();
     showDisplay();
     Serial.println("Écran initialisé");
@@ -98,8 +100,6 @@ void showMainData()
     // Serial.printf("[DISPLAY] Appel de showMainData. isDataValid = %d\n", (int)latestMetrics.isDataValid);
     // --- FIN DU BLOC DE DÉBOGAGE ---
 
-    // --- Début de la modification ---
-
     // Vérifie d'abord si les données des batteries sont valides.
     if (latestMetrics.isDataValid)
     {
@@ -148,4 +148,33 @@ void showMainData()
     drawText(80, 55, "OK:menu");
 
     showDisplay();
+}
+
+void turnOnDisplay()
+{
+    if (display_u8g2)
+    {
+        display_u8g2->setPowerSave(0);
+        isScreenOn = true;
+        Serial.println("Écran allumé");
+    }
+}
+
+void turnOffDisplay()
+{
+    if (display_u8g2)
+    {
+        display_u8g2->setPowerSave(1);
+        isScreenOn = false;
+        Serial.println("Écran éteint");
+    }
+}
+
+void setBrightness(uint8_t value)
+{
+    if (display_u8g2)
+    {
+        // La "luminosité" de l'OLED est contrôlée par le contraste
+        display_u8g2->setContrast(value);
+    }
 }

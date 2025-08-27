@@ -14,6 +14,10 @@ enum PairingChoice
 };
 
 // ——————— VARIABLES GLOBALES ———————
+// Paramètres de l'affichage
+extern int brightnessLevel;
+extern const uint8_t brightnessValues[];
+extern uint8_t currentBrightness; // AJOUT: Stocke la valeur de luminosité actuelle
 // État du menu et navigation
 extern int currentScreen;    // État actuel de l'interface (écran principal, menu, saisie code, etc.)
 extern int selectedMenuItem; // Index de l'item de menu actuellement sélectionné
@@ -47,6 +51,7 @@ void showMenuScreen();       // Affiche le menu principal avec navigation
 void showCodeInputScreen();  // Affiche l'écran de saisie du code admin
 void showCodeResultScreen(); // Affiche le résultat de validation du code admin
 void showCanFramesScreen();  // Affiche les trames CAN en temps réel
+void showBrightnessScreen(); // Affiche l'écran de choix de luminosité
 
 // ——————— GESTION MODE ADMIN ———————
 void activateAdminMode();   // Active le mode admin (ajoute items avancés au menu)

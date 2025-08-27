@@ -28,8 +28,8 @@ unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence
 unsigned long lastMetricsUpdate = 0;
 const long METRICS_UPDATE_INTERVAL = 10000; // 10 secondes
 AggregateBatteryMetrics latestMetrics;
-
-int configuredBatteryCount = 0; // Nombre de batteries configurées par l'utilisateur
+unsigned long lastActivityTime = 0; // Variable globale pour la gestion de l'inactivité
+int configuredBatteryCount = 0;     // Nombre de batteries configurées par l'utilisateur
 // ——————— INITIALISATION SYSTÈME ———————
 void setup()
 {
@@ -40,13 +40,16 @@ void setup()
   configuredBatteryCount = loadBatteryCount(); // Chargement du nombre de batteries configurées
   Serial.printf("INFO: %d batterie(s) configurée(s) au démarrage.\n", configuredBatteryCount);
 
-  initDisplay(&u8g2); // Initialisation de l'écran OLED
+  initDisplay(&u8g2);                               // Initialisation de l'écran OLED
+  setBrightness(brightnessValues[brightnessLevel]); // Initialiser la luminosité avec la valeur par défaut
 
   // Initialisation des boutons de navigation avec anti-rebond
   initButtons(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
   setDebounceDelay(DEBOUNCE_DELAY);
 
   initModbus(&MODBUS_SERIAL); // Initialisation de la communication Modbus RS485 avec les batteries
+
+  lastActivityTime = millis(); // Initialiser le timer
 
   initMenu(); // Initialisation du système de menus
 
@@ -79,8 +82,14 @@ void loop()
 
   handleButtonEvents(); // Traitement des événements boutons
 
+  // Vérifier l'inactivité pour éteindre l'écran
+  if (isScreenOn && (millis() - lastActivityTime > SCREEN_TIMEOUT_MS))
+  {
+    turnOffDisplay();
+  }
+
   // Mise à jour de l'affichage à intervalles réguliers
-  if (now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL)
+  if (isScreenOn && now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL)
   {
     updateMenuDisplay();
     lastDisplayUpdate = now;
@@ -101,27 +110,27 @@ void loop()
 // ——————— GESTION DES ÉVÉNEMENTS BOUTONS ———————
 void handleButtonEvents()
 {
-  // Navigation vers le haut (menu, code admin, etc.)
-  if (isUpPressed())
-  {
-    navigateMenuUp();
-  }
 
-  // Navigation vers le bas
-  if (isDownPressed())
+  // Si un bouton est pressé
+  if (isUpPressed() || isDownPressed() || isOkPressed() || isBackPressed())
   {
-    navigateMenuDown();
-  }
+    lastActivityTime = millis(); // Réinitialiser le timer d'activité
 
-  // Validation/sélection
-  if (isOkPressed())
-  {
-    selectMenuItem(); // Gère automatiquement le contexte (menu, écran principal, etc.)
-  }
+    // Si l'écran est éteint, le premier appui ne fait que le rallumer
+    if (!isScreenOn)
+    {
+      turnOnDisplay();
+      return; // Sortir pour ne pas traiter l'action du bouton immédiatement
+    }
 
-  // Retour/annulation
-  if (isBackPressed())
-  {
-    goBackMenu();
+    // Sinon, traiter l'action du bouton normalement
+    if (isUpPressed())
+      navigateMenuUp();
+    if (isDownPressed())
+      navigateMenuDown();
+    if (isOkPressed())
+      selectMenuItem();
+    if (isBackPressed())
+      goBackMenu();
   }
 }

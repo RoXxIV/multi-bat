@@ -9,6 +9,9 @@ int selectedMenuItem = 0;
 int totalMenuItems = 0;
 int menuViewTop = 0;
 bool adminMode = false;
+int brightnessLevel = 3; // Niveau par défaut (1 à 5)
+// Tableau de correspondance: index 0 est ignoré, index 1=Niveau 1, etc.
+const uint8_t brightnessValues[] = {0, 1, 30, 80, 150, 255};
 // Code admin
 int codeDigits[3] = {0, 0, 0};
 int currentDigit = 0;
@@ -35,6 +38,7 @@ void buildMenu()
     menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
     menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, false};
     menuItems[totalMenuItems++] = {"Afficher trames CAN", ACTION_CAN_FRAMES, false};
+    menuItems[totalMenuItems++] = {"Regler luminosite", ACTION_BRIGHTNESS, false};
     menuItems[totalMenuItems++] = {"Mode admin", ACTION_ADMIN_CODE, false};
 
     // Items admin uniquement
@@ -72,7 +76,15 @@ void navigateMenuUp()
     {
         codeDigits[currentDigit] = (codeDigits[currentDigit] + 1) % 10;
     }
-    // MAIN_DATA : pas de navigation up/down
+    else if (currentScreen == SCREEN_BRIGHTNESS)
+    {
+        if (brightnessLevel < 5)
+        {
+            brightnessLevel++;
+            setBrightness(brightnessValues[brightnessLevel]);
+        }
+        // MAIN_DATA : pas de navigation up/down
+    }
 }
 
 void navigateMenuDown()
@@ -86,6 +98,14 @@ void navigateMenuDown()
     else if (currentScreen == SCREEN_CODE_INPUT)
     {
         codeDigits[currentDigit] = (codeDigits[currentDigit] + 9) % 10; // -1 mod 10
+    }
+    else if (currentScreen == SCREEN_BRIGHTNESS)
+    {
+        if (brightnessLevel > 1)
+        {
+            brightnessLevel--;
+            setBrightness(brightnessValues[brightnessLevel]);
+        }
     }
     // MAIN_DATA : pas de navigation up/down
 }
@@ -116,6 +136,12 @@ void selectMenuItem()
     else if (currentScreen == SCREEN_CODE_RESULT)
     {
         currentScreen = SCREEN_MENU;
+    }
+    else if (currentScreen == SCREEN_BRIGHTNESS)
+    {
+        // L'action est déjà appliquée en direct, OK sert juste à retourner au menu
+        currentScreen = SCREEN_MENU;
+        Serial.printf("Niveau de luminosité final: %d (valeur %d)\n", brightnessLevel, brightnessValues[brightnessLevel]);
     }
 }
 
@@ -150,6 +176,9 @@ void goBackMenu()
         currentScreen = SCREEN_MENU;
         Serial.println("Retour du menu CAN vers menu principal");
         break;
+    case SCREEN_BRIGHTNESS:
+        currentScreen = SCREEN_MENU;
+        break;
     }
 }
 
@@ -170,15 +199,18 @@ void updateMenuDisplay()
     case SCREEN_CODE_RESULT:
         showCodeResultScreen();
         break;
-    case SCREEN_CAN_FRAMES: // ⭐ MANQUE ICI !
+    case SCREEN_CAN_FRAMES:
         showCanFramesScreen();
+        break;
+    case SCREEN_BRIGHTNESS:
+        showBrightnessScreen();
         break;
     }
 }
 
 void showMainDataScreen()
 {
-    showMainData(); // Utilise la fonction du DisplayManager (pour l'instant, fake data)
+    showMainData();
 }
 
 void showMenuScreen()
@@ -316,8 +348,8 @@ void executeMenuAction(int idx)
     case ACTION_SYSTEM_SETTINGS:
         actionSystemSettings();
         break;
-    case ACTION_CAN_FRAMES:
-        actionShowCanFrames();
+    case ACTION_BRIGHTNESS:
+        currentScreen = SCREEN_BRIGHTNESS;
         break;
     }
 }
@@ -396,7 +428,7 @@ void actionShowCanFrames()
     Serial.println("Action: Affichage trames CAN");
     extern void setCanDisplayActive(bool active);
     setCanDisplayActive(true);
-    currentScreen = SCREEN_CAN_FRAMES; // ⭐ CRUCIAL: changer l'écran
+    currentScreen = SCREEN_CAN_FRAMES;
     Serial.printf("DEBUG: currentScreen = %d\n", currentScreen);
 }
 
@@ -681,4 +713,24 @@ PairingChoice showErrorMenu()
     }
 
     return CHOICE_FINISH;
+}
+
+void showBrightnessScreen()
+{
+    clearDisplay();
+    drawTitle("LUMINOSITE");
+
+    // Afficher le niveau actuel (1 à 5)
+    char buf[20];
+    sprintf(buf, "Niveau: %d / 5", brightnessLevel);
+    drawText(5, 30, buf);
+
+    // Dessiner une barre de progression basée sur le niveau
+    int barWidth = map(brightnessLevel, 1, 5, 0, 120);
+    drawFrame(3, 40, 122, 10);
+    display_u8g2->drawBox(4, 41, barWidth, 8);
+    // Instructions
+    // drawText(0, 60, "R:annuler   OK:valider");
+
+    showDisplay();
 }

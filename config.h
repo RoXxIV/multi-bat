@@ -27,8 +27,9 @@
 #define ADMIN_CODE_2 0 // deuxième chiffre
 #define ADMIN_CODE_3 0 // troisième chiffre
 // Paramètres temporels du système
-#define DEBOUNCE_DELAY 50    // Délai anti-rebond boutons (ms)
-#define MESSAGE_TIMEOUT 1500 // Durée affichage messages (ms)
+#define DEBOUNCE_DELAY 50       // Délai anti-rebond boutons (ms)
+#define MESSAGE_TIMEOUT 1500    // Durée affichage messages (ms)
+#define SCREEN_TIMEOUT_MS 60000 // Durée d'inactivité avant extinction écran (60s)
 // Limites de l'interface utilisateur
 #define MAX_MENU_ITEMS 10    // Nombre maximum d'items de menu
 #define VISIBLE_MENU_ITEMS 4 // Items visibles simultanément
@@ -56,7 +57,8 @@ enum ScreenType
     SCREEN_MENU = 1,        // Écran de menu principal
     SCREEN_CODE_INPUT = 2,  // Écran de saisie code admin
     SCREEN_CODE_RESULT = 3, // Écran de résultat validation code
-    SCREEN_CAN_FRAMES = 4   // Écran d'affichage trames CAN
+    SCREEN_CAN_FRAMES = 4,  // Écran d'affichage trames CAN
+    SCREEN_BRIGHTNESS = 5   // AJOUT: Écran de réglage de luminosité
 };
 // Actions disponibles dans les menus
 enum MenuActions
@@ -67,7 +69,8 @@ enum MenuActions
     ACTION_ADMIN_CODE = 4,      // Saisie code administrateur
     ACTION_PAIRING = 5,         // Processus d'appairage batteries
     ACTION_SYSTEM_SETTINGS = 6, // Paramètres système (admin)
-    ACTION_CAN_FRAMES = 7       // Affichage trames CAN temps réel
+    ACTION_CAN_FRAMES = 7,      // Affichage trames CAN temps réel
+    ACTION_BRIGHTNESS = 8       // Action pour régler la luminosité
 };
 
 // ——————— STRUCTURES DE DONNÉES ———————
