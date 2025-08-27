@@ -682,13 +682,3 @@ PairingChoice showErrorMenu()
 
     return CHOICE_FINISH;
 }
-// ——————— GETTERS ———————
-int getCurrentScreen()
-{
-    return currentScreen;
-}
-
-int getTotalMenuItems()
-{
-    return totalMenuItems;
-}

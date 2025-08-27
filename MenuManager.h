@@ -76,8 +76,5 @@ void waitForUserConfirmation(const char *title, const char *line1, const char *l
 // ——————— FONCTIONS UTILITAIRES ———————
 void adjustMenuView();                 // Ajuste la fenêtre de visualisation du menu (scroll automatique)
 void executeMenuAction(int itemIndex); // Exécute l'action associée à un item de menu
-// Getters
-int getCurrentScreen();  // Retourne l'écran actuellement affiché
-int getTotalMenuItems(); // Retourne le nombre total d'items de menu
 
 #endif

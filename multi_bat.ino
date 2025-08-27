@@ -138,14 +138,3 @@ void handleButtonEvents()
     goBackMenu();
   }
 }
-
-// ——————— FONCTIONS UTILITAIRES ———————
-// Affiche l'état système sur le port série (pour debug)
-void printSystemStatus()
-{
-  Serial.println("\n=== STATUS SYSTÈME ===");
-  Serial.printf("Consigne charge: %.1fA\n", getChargeCurrentSetpoint());
-  Serial.printf("Consigne décharge: %.1fA\n", getDischargeCurrentSetpoint());
-  Serial.printf("Uptime: %lu s\n", millis() / 1000);
-  Serial.println("========================\n");
-}
