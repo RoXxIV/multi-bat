@@ -3,7 +3,7 @@
 #include "CanBusManager.h"
 // ——————— VARIABLE GLOBALE ———————
 U8G2 *display_u8g2 = nullptr;
-bool isScreenOn = true; // vvv
+bool isScreenOn = true;
 extern AggregateBatteryMetrics latestMetrics;
 extern int configuredBatteryCount;
 
@@ -13,7 +13,7 @@ void initDisplay(U8G2 *u8g2_ptr)
     display_u8g2 = u8g2_ptr;
     display_u8g2->begin();
     display_u8g2->setFont(u8g2_font_6x10_tf);
-    turnOnDisplay(); // vvv
+    turnOnDisplay();
     clearDisplay();
     showDisplay();
     Serial.println("Écran initialisé");
@@ -101,7 +101,7 @@ void showMainData()
         float voltage = latestMetrics.averageVoltage;
         float current = latestMetrics.totalCurrent;
 
-        // --- 1. Trouver les températures max T1 et T2 (inchangé) ---
+        // Trouver les températures max T1 et T2
         float maxT1 = -100.0f;
         float maxT2 = -100.0f;
         for (int i = 0; i < configuredBatteryCount; i++)
@@ -115,15 +115,13 @@ void showMainData()
             }
         }
 
-        // --- 2. NOUVEAU : Calculer la moyenne des températures batteries ---
+        // Calculer la moyenne des températures batteries
         float avgBatteryTemp = (maxT1 + maxT2) / 2.0f;
 
         float chargeSetpoint = getChargeCurrentSetpoint();
         float dischargeSetpoint = getDischargeCurrentSetpoint();
 
         char line[32];
-
-        // --- 3. NOUVELLE DISPOSITION D'AFFICHAGE sur 3 lignes ---
 
         // Ligne 1 : SOC et Tension
         sprintf(line, "SOC:%.1f%%", soc);
@@ -134,7 +132,7 @@ void showMainData()
         // Ligne 2 : Courant et Température moyenne des batteries
         sprintf(line, "I:%.1fA", current);
         drawText(5, 22, line);
-        sprintf(line, "Temp:%.1fC", avgBatteryTemp); // <-- Utilisation de la nouvelle variable
+        sprintf(line, "Temp:%.1fC", avgBatteryTemp);
         drawText(70, 22, line);
 
         // Ligne 3 : Consignes Charge / Décharge

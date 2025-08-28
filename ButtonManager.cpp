@@ -5,7 +5,6 @@ ButtonState buttons[BTN_COUNT];
 unsigned long debounceDelay = 50;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
-
 void initButtons(int upPin, int downPin, int okPin, int backPin)
 {
     // Affectation des pins

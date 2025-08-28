@@ -58,7 +58,7 @@ enum ScreenType
     SCREEN_CODE_INPUT = 2,    // Écran de saisie code admin
     SCREEN_CODE_RESULT = 3,   // Écran de résultat validation code
     SCREEN_CAN_FRAMES = 4,    // Écran d'affichage trames CAN
-    SCREEN_BRIGHTNESS = 5,    // AJOUT: Écran de réglage de luminosité
+    SCREEN_BRIGHTNESS = 5,    // Écran de réglage de luminosité
     SCREEN_BATTERY_LIST = 6,  // Nouvel écran: liste des batteries
     SCREEN_BATTERY_DETAIL = 7 // Nouvel écran: détails d'une batterie
 };

@@ -7,7 +7,7 @@
 
 // ——————— VARIABLES GLOBALES ———————
 extern U8G2 *display_u8g2; // Pointeur vers l'objet U8G2 de l'afficheur
-extern bool isScreenOn;    // AJOUT: Indicateur si l'écran est allumé vvv
+extern bool isScreenOn;    // Indicateur si l'écran est allumé
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initDisplay(U8G2 *u8g2_ptr); // Initialise l'écran OLED avec la configuration par défaut
@@ -27,6 +27,6 @@ void setBrightness(uint8_t value);          // contrôle la luminosité de l'éc
 void showMessage(const char *title, const char *message); // Affiche un message simple avec titre et texte centré
 void showMainData();                                      // Affiche l'écran principal avec données batteries (pour l'instant fake data)
 // ——————— GESTION DE L'ALIMENTATION DE L'Ecran ———————
-void turnOnDisplay();
-void turnOffDisplay();
+void turnOnDisplay();  // Allume l'écran
+void turnOffDisplay(); // Eteint l'écran
 #endif

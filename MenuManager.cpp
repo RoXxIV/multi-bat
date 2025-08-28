@@ -89,7 +89,7 @@ void navigateMenuUp()
     }
     else if (currentScreen == SCREEN_BATTERY_LIST)
     {
-        extern int configuredBatteryCount; // On a besoin du nombre de batteries
+        extern int configuredBatteryCount; // nombre de batteries
         if (configuredBatteryCount > 0)
         {
             selectedBatteryIndex = (selectedBatteryIndex - 1 + configuredBatteryCount) % configuredBatteryCount;
@@ -341,6 +341,7 @@ void showCanFramesScreen()
     extern void showCanFrames();
     showCanFrames();
 }
+
 void showBatteryListScreen()
 {
     extern int configuredBatteryCount;

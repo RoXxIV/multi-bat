@@ -38,7 +38,7 @@ extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 // ——————— CONSTANTES MODBUS ———————
 // Paramètres de communication
 #define BAUD_RATE 9600   // Vitesse de communication série
-#define MASTER_ADDR 0x81 // Adresse de l'ESP32 en tant que maître vvv
+#define MASTER_ADDR 0x81 // Adresse de l'ESP32 en tant que maître
 
 // --- FONCTIONS D'INITIALISATION ---
 void initModbus();

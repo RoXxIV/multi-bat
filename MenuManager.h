@@ -15,9 +15,9 @@ enum PairingChoice
 
 // ——————— VARIABLES GLOBALES ———————
 // Paramètres de l'affichage
-extern int brightnessLevel;
-extern const uint8_t brightnessValues[];
-extern uint8_t currentBrightness; // AJOUT: Stocke la valeur de luminosité actuelle
+extern int brightnessLevel;              // Niveau de luminosité (1 à 5)
+extern const uint8_t brightnessValues[]; // Tableau de valeurs de luminosité
+extern uint8_t currentBrightness;        // Stocke la valeur de luminosité actuelle
 // État du menu et navigation
 extern int currentScreen;        // État actuel de l'interface (écran principal, menu, saisie code, etc.)
 extern int selectedMenuItem;     // Index de l'item de menu actuellement sélectionné
