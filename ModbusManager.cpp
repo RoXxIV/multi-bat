@@ -251,10 +251,10 @@ void updateBatteryStaticInfo(uint8_t batteryId)
         {
             uint8_t *data = &receiveBuffer[3];
 
-            // Le numéro de série est encodé sur 32 octets (16 registres).
-            // On le copie directement dans notre structure.
-            memcpy(batteryData->serialNumber, data, 32);
-            batteryData->serialNumber[32] = '\0'; // On ajoute le caractère de fin de chaîne.
+            // Le nombre d'octets est le nombre de registres * 2.
+            const int serialNumberBytes = REG_SERIAL_NUMBER_COUNT * 2;
+            memcpy(batteryData->serialNumber, data, serialNumberBytes);
+            batteryData->serialNumber[serialNumberBytes] = '\0'; // On ajoute le caractère de fin de chaîne.
 
             Serial.printf("INFO: S/N de la batterie ID=%d lu avec succès: %s\n", batteryId, batteryData->serialNumber);
         }
