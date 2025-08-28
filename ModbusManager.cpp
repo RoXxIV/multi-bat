@@ -1,38 +1,25 @@
 #include "ModbusManager.h"
+#include "ModbusLib.h"
 #include "DisplayManager.h"
 // ——————— VARIABLES GLOBALES ———————
-HardwareSerial *modbusSerial = nullptr; // pointeur qui contiendra le port serie à utiliser
-uint8_t sendBuffer[256];                // Tableau pour construire les commandes Modbus à envoyer
-uint8_t receiveBuffer[256];             // Tableau pour stocker les réponses reçues des batteries
+extern HardwareSerial modbusSerial; // pointeur qui contiendra le port serie à utiliser
+uint8_t sendBuffer[256];            // Tableau pour construire les commandes Modbus à envoyer
+uint8_t receiveBuffer[256];         // Tableau pour stocker les réponses reçues des batteries
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 
-void initModbus(HardwareSerial *serial)
+void initModbus()
 {
-    // Configuration du pin DE/RE pour RS485
-    pinMode(MODBUS_DE_RE_PIN, OUTPUT);
-    enableRS485Receive(); // Mode réception par défaut
+    // On passe l'adresse de l'objet global à notre librairie
+    modbus_init(&modbusSerial, MODBUS_DE_RE_PIN);
 
-    modbusSerial = serial;
-    // modbusSerial->begin(BAUD_RATE, SERIAL_8E1, MODBUS_RX_PIN, MODBUS_TX_PIN); //vvv
-    modbusSerial->begin(BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
-    // Initialiser les buffers
+    // On initialise directement l'objet global
+    modbusSerial.begin(BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
+
     memset(sendBuffer, 0, sizeof(sendBuffer));
     memset(receiveBuffer, 0, sizeof(receiveBuffer));
 
-    Serial.println("Modbus initialisé - Baud: 9600 8E1");
-    Serial.printf("Pins: RX=%d, TX=%d, DE/RE=%d\n", MODBUS_RX_PIN, MODBUS_TX_PIN, MODBUS_DE_RE_PIN);
-    Serial.printf("Adresse maître: 0x%02X\n", MASTER_ADDR);
-}
-
-void enableRS485Transmit()
-{
-    digitalWrite(MODBUS_DE_RE_PIN, HIGH); // Mode émission
-}
-
-void enableRS485Receive()
-{
-    digitalWrite(MODBUS_DE_RE_PIN, LOW); // Mode réception
+    Serial.println("Modbus initialisé via ModbusLib - Baud: 9600 8N1");
 }
 
 // ——————— FONCTIONS DE LECTURE ———————
@@ -64,26 +51,27 @@ void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatter
         const uint16_t regCount = endAddr - startAddr + 1;
 
         // Étape 1 : Envoi de la commande de lecture
-        int frameLength = buildReadCommand(currentBatteryId, startAddr, regCount);
+        int frameLength = modbus_build_read_frame(sendBuffer, currentBatteryId, startAddr, regCount);
         if (frameLength <= 0)
             continue;
 
-        while (modbusSerial->available())
-            modbusSerial->read();
-        enableRS485Transmit();
-        modbusSerial->write(sendBuffer, frameLength);
-        modbusSerial->flush();
-        delayMicroseconds(100);
-        enableRS485Receive();
+        while (modbusSerial.available())
+            modbusSerial.read();
+        modbus_enable_transmit();
+        modbusSerial.write(sendBuffer, frameLength);
+        modbusSerial.flush();
+        // delayMicroseconds(100);
+        delay(2);
+        modbus_enable_receive();
 
         // Étape 2 : Attente et réception de la réponse
         unsigned long timeout = millis() + 800;
         int responseLength = 0;
         while (millis() < timeout && responseLength < sizeof(receiveBuffer))
         {
-            if (modbusSerial->available())
+            if (modbusSerial.available())
             {
-                receiveBuffer[responseLength++] = modbusSerial->read();
+                receiveBuffer[responseLength++] = modbusSerial.read();
                 timeout = millis() + 50;
             }
         }
@@ -134,6 +122,145 @@ void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatter
     }
 }
 
+void updateIndividualBatteryMetrics(uint8_t batteryId)
+{
+    // Cible la bonne structure dans notre tableau global
+    IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
+    batteryData->isValid = false; // On invalide les données avant la lecture
+
+    // On lit un grand bloc de registres en une seule fois, de 0x00 à 0x5A.
+    const uint16_t startAddr = 0x00;       // Début des tensions de cellules
+    const uint16_t endAddr = REG_MOS_TEMP; // Fin à la temp. des MOSFETs
+    const uint16_t regCount = endAddr - startAddr + 1;
+
+    // Étape 1 : Envoi de la commande de lecture
+    int frameLength = modbus_build_read_frame(sendBuffer, batteryId, startAddr, regCount);
+    if (frameLength <= 0)
+        return;
+
+    while (modbusSerial.available())
+        modbusSerial.read();
+    modbus_enable_transmit();
+    modbusSerial.write(sendBuffer, frameLength);
+    modbusSerial.flush();
+    // delayMicroseconds(100);
+    delay(2);
+    modbus_enable_receive();
+
+    // Étape 2 : Réception de la réponse
+    unsigned long timeout = millis() + 800;
+    int responseLength = 0;
+    while (millis() < timeout && responseLength < sizeof(receiveBuffer))
+    {
+        if (modbusSerial.available())
+        {
+            receiveBuffer[responseLength++] = modbusSerial.read();
+            timeout = millis() + 50;
+        }
+    }
+
+    // Étape 3 : Analyse et décodage de la réponse
+    if (responseLength > 0)
+    {
+        uint8_t expectedAddr = 0x50 + batteryId;
+        uint16_t receivedCrc = (receiveBuffer[responseLength - 1] << 8) | receiveBuffer[responseLength - 2];
+        uint16_t calculatedCrc = calculateCRC16(receiveBuffer, responseLength - 2);
+
+        if (receiveBuffer[0] == expectedAddr && receivedCrc == calculatedCrc)
+        {
+            uint8_t *data = &receiveBuffer[3];
+
+            // Tensions des 15 cellules (Registres 0x00 à 0x0E)
+            for (int i = 0; i < 15; i++)
+            {
+                batteryData->cellVoltages[i] = ((data[i * 2] << 8) | data[i * 2 + 1]) / 1000.0f;
+            }
+
+            // Températures 1 et 2 (Registres 0x30 et 0x31)
+            int tempOffset = (REG_TEMPERATURES_START - startAddr) * 2;
+            batteryData->temp1 = (((data[tempOffset] << 8) | data[tempOffset + 1])) - 40.0f;
+            batteryData->temp2 = (((data[tempOffset + 2] << 8) | data[tempOffset + 3])) - 40.0f;
+
+            // Tension, Courant, SOC (Registres 0x38 à 0x3A)
+            int mainMetricsOffset = (REG_TOTAL_VOLTAGE - startAddr) * 2;
+            batteryData->voltage = ((data[mainMetricsOffset] << 8) | data[mainMetricsOffset + 1]) / 10.0f;
+            batteryData->current = (((int16_t)((data[mainMetricsOffset + 2] << 8) | data[mainMetricsOffset + 3])) - 30000) * 0.1f;
+            batteryData->soc = ((data[mainMetricsOffset + 4] << 8) | data[mainMetricsOffset + 5]) / 10.0f;
+
+            // Heartbeat (Registre 0x3B)
+            int heartbeatOffset = (REG_HEARTBEAT - startAddr) * 2;
+            batteryData->heartbeat = (data[heartbeatOffset] << 8) | data[heartbeatOffset + 1];
+
+            // Statut des MOSFETs (Registres 0x52 et 0x53)
+            int mosfetOffset = (REG_CHARGE_MOSFET - startAddr) * 2;
+            batteryData->chargeMosfetStatus = (data[mosfetOffset + 1] & 0x01) != 0;
+            batteryData->dischargeMosfetStatus = (data[mosfetOffset + 3] & 0x01) != 0;
+
+            // Température MOS (Registre 0x5A)
+            int mosTempOffset = (REG_MOS_TEMP - startAddr) * 2;
+            batteryData->mosTemp = (((data[mosTempOffset] << 8) | data[mosTempOffset + 1])) - 40.0f;
+
+            batteryData->isValid = true;
+            Serial.printf("INFO: Données détaillées de la batterie ID=%d mises à jour.\n", batteryId);
+        }
+    }
+}
+void updateBatteryStaticInfo(uint8_t batteryId)
+{
+    // Cible la bonne structure dans notre tableau global
+    IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
+    // On ne change pas isValid ici, car cette fonction ne fait que compléter les infos.
+
+    // Étape 1 : Envoi de la commande de lecture pour le numéro de série
+    int frameLength = modbus_build_read_frame(sendBuffer, batteryId, REG_SERIAL_NUMBER_START, REG_SERIAL_NUMBER_COUNT);
+    if (frameLength <= 0)
+        return;
+
+    modbus_print_buffer("ENVOI (Info statique)", sendBuffer, frameLength);
+
+    while (modbusSerial.available())
+        modbusSerial.read();
+    modbus_enable_transmit();
+    modbusSerial.write(sendBuffer, frameLength);
+    modbusSerial.flush();
+    // delayMicroseconds(100);
+    delay(2);
+    modbus_enable_receive();
+
+    // Étape 2 : Réception de la réponse
+    unsigned long timeout = millis() + 800;
+    int responseLength = 0;
+    while (millis() < timeout && responseLength < sizeof(receiveBuffer))
+    {
+        if (modbusSerial.available())
+        {
+            receiveBuffer[responseLength++] = modbusSerial.read();
+            timeout = millis() + 50;
+        }
+    }
+
+    // Étape 3 : Analyse et décodage de la réponse
+    if (responseLength > 0)
+    {
+        modbus_print_buffer("RECU (Info statique)", receiveBuffer, responseLength);
+        uint8_t expectedAddr = 0x50 + batteryId;
+        uint16_t receivedCrc = (receiveBuffer[responseLength - 1] << 8) | receiveBuffer[responseLength - 2];
+        uint16_t calculatedCrc = calculateCRC16(receiveBuffer, responseLength - 2);
+
+        if (receiveBuffer[0] == expectedAddr && receivedCrc == calculatedCrc)
+        {
+            uint8_t *data = &receiveBuffer[3];
+
+            // Le numéro de série est encodé sur 32 octets (16 registres).
+            // On le copie directement dans notre structure.
+            memcpy(batteryData->serialNumber, data, 32);
+            batteryData->serialNumber[32] = '\0'; // On ajoute le caractère de fin de chaîne.
+
+            Serial.printf("INFO: S/N de la batterie ID=%d lu avec succès: %s\n", batteryId, batteryData->serialNumber);
+        }
+    }
+}
+
 // ——————— FONCTIONS D'ÉCRITURE  ———————
 bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
 {
@@ -167,21 +294,22 @@ bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
 
     char label[40];
     sprintf(label, "DISPLAY_ASCII_%d ID=%d", asciiValue, batteryId);
-    printModbusBuffer(label, sendBuffer, 16);
+    modbus_print_buffer(label, sendBuffer, 16);
 
     // Vider le buffer de réception simple
-    while (modbusSerial->available())
+    while (modbusSerial.available())
     {
-        modbusSerial->read();
+        modbusSerial.read();
     }
 
     // Envoi
-    enableRS485Transmit();
-    modbusSerial->write(sendBuffer, 16);
-    modbusSerial->flush();
+    modbus_enable_transmit();
+    modbusSerial.write(sendBuffer, 16);
+    modbusSerial.flush();
     // delay(10); vvv
-    delayMicroseconds(100);
-    enableRS485Receive();
+    // delayMicroseconds(100);
+    delay(2);
+    modbus_enable_receive();
 
     // Attendre l'ACK
     sprintf(label, "DISPLAY_ASCII_%d", asciiValue);
@@ -225,21 +353,22 @@ bool changeBatteryIdTo1(uint8_t batteryId)
 
     char label[40];
     sprintf(label, "CHANGE_ID_%d_TO_1", batteryId);
-    printModbusBuffer(label, sendBuffer, 8);
+    modbus_print_buffer(label, sendBuffer, 8);
 
     // Vider le buffer de réception
-    while (modbusSerial->available())
+    while (modbusSerial.available())
     {
-        modbusSerial->read();
+        modbusSerial.read();
     }
 
     // Envoi
-    enableRS485Transmit();
-    modbusSerial->write(sendBuffer, 8);
-    modbusSerial->flush();
+    modbus_enable_transmit();
+    modbusSerial.write(sendBuffer, 8);
+    modbusSerial.flush();
     // delay(10);vvv
-    delayMicroseconds(100);
-    enableRS485Receive();
+    // delayMicroseconds(100);
+    delay(2);
+    modbus_enable_receive();
 
     // Attendre l'ACK
     bool ackReceived = waitForAck(batteryId, label);
@@ -280,17 +409,18 @@ bool changeBatteryIdFrom1To(uint8_t newId)
 
     char label[40];
     sprintf(label, "CHANGE_ID_1_TO_%d", newId);
-    printModbusBuffer(label, sendBuffer, 8);
+    modbus_print_buffer(label, sendBuffer, 8);
 
-    while (modbusSerial->available())
-        modbusSerial->read();
+    while (modbusSerial.available())
+        modbusSerial.read();
 
-    enableRS485Transmit();
-    modbusSerial->write(sendBuffer, 8);
-    modbusSerial->flush();
+    modbus_enable_transmit();
+    modbusSerial.write(sendBuffer, 8);
+    modbusSerial.flush();
     // delay(10); vvv
-    delayMicroseconds(100);
-    enableRS485Receive();
+    // delayMicroseconds(100);
+    delay(2);
+    modbus_enable_receive();
 
     bool ackReceived = waitForAck(1, label); // On attend l'ACK de l'ancienne adresse (1)
 
@@ -339,29 +469,6 @@ bool changeAllBatteriesToId1()
 }
 
 // ——————— FONCTIONS UTILITAIRES ———————
-
-int buildReadCommand(uint8_t batteryId, uint16_t startAddr, uint16_t regCount)
-{
-    // --- CORRECTION FINALE ---
-    // On revient à un format Modbus standard où la trame est envoyée
-    // directement à l'adresse de la batterie (ex: 0x82 pour ID 2).
-    // C'est la même logique que pour les commandes d'écriture qui, elles, fonctionnent.
-
-    sendBuffer[0] = 0x80 + batteryId;        // Adresse cible de la batterie
-    sendBuffer[1] = CMD_READ_HOLDING;        // Fonction lecture (0x03)
-    sendBuffer[2] = (startAddr >> 8) & 0xFF; // Adresse du premier registre (poids fort)
-    sendBuffer[3] = startAddr & 0xFF;        // (poids faible)
-    sendBuffer[4] = (regCount >> 8) & 0xFF;  // Nombre de registres à lire (poids fort)
-    sendBuffer[5] = regCount & 0xFF;         // (poids faible)
-
-    // Le calcul du CRC reste identique.
-    uint16_t crc = calculateCRC16(sendBuffer, 6);
-    sendBuffer[6] = crc & 0xFF;
-    sendBuffer[7] = (crc >> 8) & 0xFF;
-
-    return 8;
-}
-
 bool waitForAck(uint8_t batteryId, const char *operation)
 {
     const uint8_t ADDR = 0x50 + batteryId;
@@ -374,9 +481,9 @@ bool waitForAck(uint8_t batteryId, const char *operation)
 
     while (millis() < T_DEADLINE)
     {
-        while (modbusSerial->available())
+        while (modbusSerial.available())
         {
-            uint8_t b = modbusSerial->read();
+            uint8_t b = modbusSerial.read();
             lastByte = millis();
             if (n < (int)sizeof(buf))
                 buf[n++] = b;
@@ -394,7 +501,7 @@ bool waitForAck(uint8_t batteryId, const char *operation)
                         {
                             char label[32];
                             sprintf(label, "ACK_VALIDE_FC%02X", buf[i + 1]);
-                            printModbusBuffer(label, &buf[i], 8);
+                            modbus_print_buffer(label, &buf[i], 8);
                             return true;
                         }
                     }
@@ -409,7 +516,7 @@ bool waitForAck(uint8_t batteryId, const char *operation)
                     if (buf[i] == ADDR && buf[i + 1] == 0x50 && buf[i + 2] == 0x00 && buf[i + 3] == 0x01)
                     {
                         // Pas de vérif CRC : les 2 derniers octets ne sont pas CRC Modbus sur certains firmwares Daly.
-                        printModbusBuffer("ACK_VALIDE_SHORT", &buf[i], 6);
+                        modbus_print_buffer("ACK_VALIDE_SHORT", &buf[i], 6);
                         return true;
                     }
                 }
@@ -436,37 +543,39 @@ bool waitForAck(uint8_t batteryId, const char *operation)
     return false;
 }
 
-uint16_t calculateCRC16(uint8_t *data, uint8_t length)
+// DEBUG
+void printIndividualBatteryData(uint8_t batteryId)
 {
-    uint16_t crc = 0xFFFF;
+    // Cible la bonne structure dans le tableau global
+    IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
 
-    for (int i = 0; i < length; i++)
-    {
-        crc ^= data[i];
-        for (int j = 0; j < 8; j++)
-        {
-            if (crc & 0x0001)
-            {
-                crc >>= 1;
-                crc ^= 0xA001;
-            }
-            else
-            {
-                crc >>= 1;
-            }
-        }
-    }
-    return crc;
-}
+    // Affiche un en-tête pour identifier la batterie
+    Serial.printf("\n--- DEBUG: Données Batterie ID=%d ---\n", batteryId);
 
-void printModbusBuffer(const char *label, uint8_t *buffer, int length)
-{
-    Serial.printf("%s [%d bytes]: ", label, length);
-    for (int i = 0; i < length; i++)
+    // Vérifie si les données sont valides avant de les afficher
+    if (!batteryData->isValid)
     {
-        Serial.printf("%02X ", buffer[i]);
-        if ((i + 1) % 8 == 0)
-            Serial.print(" ");
+        Serial.println("  /!\\ Données invalides ou non encore lues.");
+        return;
     }
-    Serial.println();
+
+    // Affiche chaque information avec son unité
+    Serial.printf("  - Statut           : VALIDE\n");
+    Serial.printf("  - Tension          : %.2f V\n", batteryData->voltage);
+    Serial.printf("  - Courant          : %.2f A\n", batteryData->current);
+    Serial.printf("  - SOC              : %.1f %%\n", batteryData->soc);
+    Serial.printf("  - MOSFET Charge    : %s\n", batteryData->chargeMosfetStatus ? "ON" : "OFF");
+    Serial.printf("  - MOSFET Décharge  : %s\n", batteryData->dischargeMosfetStatus ? "ON" : "OFF");
+    Serial.printf("  - Température 1    : %.1f C\n", batteryData->temp1);
+    Serial.printf("  - Température 2    : %.1f C\n", batteryData->temp2);
+    Serial.printf("  - Température MOS  : %.1f C\n", batteryData->mosTemp);
+    Serial.printf("  - Heartbeat        : %u\n", batteryData->heartbeat);
+
+    // Affiche les tensions des 4 premières cellules pour un aperçu rapide
+    Serial.printf("  - Cellules (1-4)   : %.3fV | %.3fV | %.3fV | %.3fV\n",
+                  batteryData->cellVoltages[0],
+                  batteryData->cellVoltages[1],
+                  batteryData->cellVoltages[2],
+                  batteryData->cellVoltages[3]);
+    Serial.println("------------------------------------");
 }

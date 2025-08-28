@@ -17,6 +17,7 @@
 #include "NvsManager.h"
 
 // ——————— OBJETS MATÉRIELS ———————
+HardwareSerial modbusSerial(2); // Port serie pour la communication Modbus
 // Instance de l'écran OLED 128x64 I2C
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET);
 
@@ -28,6 +29,7 @@ unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence
 unsigned long lastMetricsUpdate = 0;
 const long METRICS_UPDATE_INTERVAL = 10000; // 10 secondes
 AggregateBatteryMetrics latestMetrics;
+IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 unsigned long lastActivityTime = 0; // Variable globale pour la gestion de l'inactivité
 int configuredBatteryCount = 0;     // Nombre de batteries configurées par l'utilisateur
 // ——————— INITIALISATION SYSTÈME ———————
@@ -47,7 +49,7 @@ void setup()
   initButtons(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
   setDebounceDelay(DEBOUNCE_DELAY);
 
-  initModbus(&MODBUS_SERIAL); // Initialisation de la communication Modbus RS485 avec les batteries
+  initModbus(); // Initialisation de la communication Modbus RS485 avec les batteries
 
   lastActivityTime = millis(); // Initialiser le timer
 
@@ -65,6 +67,16 @@ void setup()
     // Après l'appairage, on recharge le nombre de batteries pour être à jour
     configuredBatteryCount = loadBatteryCount();
     Serial.printf("INFO: Appairage terminé. %d batterie(s) maintenant configurée(s).\n", configuredBatteryCount);
+  }
+  if (configuredBatteryCount > 0)
+  {
+    Serial.println("Lecture des informations statiques des batteries...");
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+      uint8_t currentBatteryId = i + 2;
+      updateBatteryStaticInfo(currentBatteryId);
+      delay(250); // Pause entre chaque batterie
+    }
   }
 
   // Message de démarrage
@@ -102,8 +114,13 @@ void loop()
     // On appelle la nouvelle fonction avec le nombre de batteries sauvegardé en NVS
     readAggregateBatteryMetrics(configuredBatteryCount, &latestMetrics);
 
-    // Vous pouvez maintenant utiliser `latestMetrics.averageSoc`, etc.
-    // pour mettre à jour l'écran ou envoyer des trames CAN.
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+      uint8_t currentBatteryId = i + 2;
+      updateIndividualBatteryMetrics(currentBatteryId);
+      printIndividualBatteryData(currentBatteryId);
+      delay(250); // Petite pause pour ne pas surcharger le bus
+    }
   }
 }
 
