@@ -60,7 +60,6 @@ void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatter
         modbus_enable_transmit();
         modbusSerial.write(sendBuffer, frameLength);
         modbusSerial.flush();
-        // delayMicroseconds(100);
         delay(2);
         modbus_enable_receive();
 
@@ -143,7 +142,6 @@ void updateIndividualBatteryMetrics(uint8_t batteryId)
     modbus_enable_transmit();
     modbusSerial.write(sendBuffer, frameLength);
     modbusSerial.flush();
-    // delayMicroseconds(100);
     delay(2);
     modbus_enable_receive();
 
@@ -223,7 +221,6 @@ void updateBatteryStaticInfo(uint8_t batteryId)
     modbus_enable_transmit();
     modbusSerial.write(sendBuffer, frameLength);
     modbusSerial.flush();
-    // delayMicroseconds(100);
     delay(2);
     modbus_enable_receive();
 
@@ -306,8 +303,6 @@ bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue)
     modbus_enable_transmit();
     modbusSerial.write(sendBuffer, 16);
     modbusSerial.flush();
-    // delay(10); vvv
-    // delayMicroseconds(100);
     delay(2);
     modbus_enable_receive();
 
@@ -365,8 +360,6 @@ bool changeBatteryIdTo1(uint8_t batteryId)
     modbus_enable_transmit();
     modbusSerial.write(sendBuffer, 8);
     modbusSerial.flush();
-    // delay(10);vvv
-    // delayMicroseconds(100);
     delay(2);
     modbus_enable_receive();
 
@@ -417,8 +410,6 @@ bool changeBatteryIdFrom1To(uint8_t newId)
     modbus_enable_transmit();
     modbusSerial.write(sendBuffer, 8);
     modbusSerial.flush();
-    // delay(10); vvv
-    // delayMicroseconds(100);
     delay(2);
     modbus_enable_receive();
 

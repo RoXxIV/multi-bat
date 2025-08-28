@@ -436,6 +436,13 @@ void actionShowCanFrames()
 void actionPairing() //
 {
     Serial.println("=== DÉBUT APPAIRAGE ===");
+    // Étape 0: Demande de connexion des batteries
+    Serial.println("Étape 0: Demande de connexion des batteries...");
+    waitForUserConfirmation(
+        "APPAIRAGE",
+        "Branchez toutes les",
+        "batteries a appairer,",
+        "puis appuyez sur OK.");
 
     // Étape 1: Reset tous les IDs à 1
     Serial.println("Étape 1: Reset ID batteries vers 1...");
