@@ -279,6 +279,7 @@ void showCodeResultScreen()
 {
     if (codeSuccess)
     {
+        activateAdminMode();
         showMessage("CODE VALIDE", "Mode Admin Active");
     }
     else
@@ -289,8 +290,7 @@ void showCodeResultScreen()
     if (millis() - resultTimer > MESSAGE_TIMEOUT) // 1500ms
     {
         if (codeSuccess)
-            activateAdminMode();
-        currentScreen = SCREEN_MENU;
+            currentScreen = SCREEN_MENU;
     }
 }
 
