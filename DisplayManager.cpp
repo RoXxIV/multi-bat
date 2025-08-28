@@ -5,6 +5,7 @@
 U8G2 *display_u8g2 = nullptr;
 bool isScreenOn = true; // vvv
 extern AggregateBatteryMetrics latestMetrics;
+extern int configuredBatteryCount;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initDisplay(U8G2 *u8g2_ptr)
@@ -94,26 +95,35 @@ void showMainData()
 {
     clearDisplay();
 
-    // --- BLOC DE DÉBOGAGE ---
-    // On ajoute un log pour voir quelle valeur la fonction d'affichage est en train de lire.
-    // Le "(int)" convertit le booléen 'true'/'false' en '1'/'0' pour l'affichage.
-    // Serial.printf("[DISPLAY] Appel de showMainData. isDataValid = %d\n", (int)latestMetrics.isDataValid);
-    // --- FIN DU BLOC DE DÉBOGAGE ---
-
-    // Vérifie d'abord si les données des batteries sont valides.
     if (latestMetrics.isDataValid)
     {
-        // Si les données sont valides, on les affiche.
         float soc = latestMetrics.averageSoc;
         float voltage = latestMetrics.averageVoltage;
         float current = latestMetrics.totalCurrent;
-        float avgTemp = latestMetrics.averageTemp;
 
-        // On récupère les consignes actuelles directement depuis le CanBusManager.
+        // --- 1. Trouver les températures max T1 et T2 (inchangé) ---
+        float maxT1 = -100.0f;
+        float maxT2 = -100.0f;
+        for (int i = 0; i < configuredBatteryCount; i++)
+        {
+            if (individualBatteryMetrics[i + 1].isValid)
+            {
+                if (individualBatteryMetrics[i + 1].temp1 > maxT1)
+                    maxT1 = individualBatteryMetrics[i + 1].temp1;
+                if (individualBatteryMetrics[i + 1].temp2 > maxT2)
+                    maxT2 = individualBatteryMetrics[i + 1].temp2;
+            }
+        }
+
+        // --- 2. NOUVEAU : Calculer la moyenne des températures batteries ---
+        float avgBatteryTemp = (maxT1 + maxT2) / 2.0f;
+
         float chargeSetpoint = getChargeCurrentSetpoint();
         float dischargeSetpoint = getDischargeCurrentSetpoint();
 
-        char line[32]; // Buffer pour formater le texte à afficher
+        char line[32];
+
+        // --- 3. NOUVELLE DISPOSITION D'AFFICHAGE sur 3 lignes ---
 
         // Ligne 1 : SOC et Tension
         sprintf(line, "SOC:%.1f%%", soc);
@@ -121,13 +131,13 @@ void showMainData()
         sprintf(line, "V:%.1fV", voltage);
         drawText(70, 12, line);
 
-        // Ligne 2 : Intensité et Température
+        // Ligne 2 : Courant et Température moyenne des batteries
         sprintf(line, "I:%.1fA", current);
         drawText(5, 22, line);
-        sprintf(line, "Temp:%.1fC", avgTemp);
+        sprintf(line, "Temp:%.1fC", avgBatteryTemp); // <-- Utilisation de la nouvelle variable
         drawText(70, 22, line);
 
-        // Ligne 3 : Consignes de charge et décharge
+        // Ligne 3 : Consignes Charge / Décharge
         sprintf(line, "Ch:%dA", (int)chargeSetpoint);
         drawText(5, 32, line);
         sprintf(line, "Dch:%dA", (int)dischargeSetpoint);
@@ -135,15 +145,10 @@ void showMainData()
     }
     else
     {
-        // Si les données ne sont pas encore valides (ex: au premier démarrage),
-        // on affiche un message d'attente.
         drawText(5, 25, "En attente des");
         drawText(5, 35, "donnees batteries...");
     }
 
-    // --- Fin de la modification ---
-
-    // Ligne 5 : Boutons (inchangée)
     drawText(5, 55, "R:N/A");
     drawText(80, 55, "OK:menu");
 
