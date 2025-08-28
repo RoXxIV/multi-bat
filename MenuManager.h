@@ -19,11 +19,13 @@ extern int brightnessLevel;
 extern const uint8_t brightnessValues[];
 extern uint8_t currentBrightness; // AJOUT: Stocke la valeur de luminosité actuelle
 // État du menu et navigation
-extern int currentScreen;    // État actuel de l'interface (écran principal, menu, saisie code, etc.)
-extern int selectedMenuItem; // Index de l'item de menu actuellement sélectionné
-extern int totalMenuItems;   // Nombre total d'items dans le menu (change selon mode admin)
-extern int menuViewTop;      // Index du premier item visible dans le menu
-extern bool adminMode;       // État du mode administrateur (débloque items avancés)
+extern int currentScreen;        // État actuel de l'interface (écran principal, menu, saisie code, etc.)
+extern int selectedMenuItem;     // Index de l'item de menu actuellement sélectionné
+extern int totalMenuItems;       // Nombre total d'items dans le menu (change selon mode admin)
+extern int menuViewTop;          // Index du premier item visible dans le menu
+extern bool adminMode;           // État du mode administrateur (débloque items avancés)
+extern int selectedBatteryIndex; // Index dans la liste des batteries (0, 1, 2...)
+extern int selectedBatteryId;    // ID de la batterie choisie (2, 3, 4...)
 // Menu items
 extern MenuItem menuItems[MAX_MENU_ITEMS]; // Tableau des items de menu avec texte et actions
 // Variables pour le code admin
@@ -46,12 +48,14 @@ void goBackMenu();       // Retour vers le menu principal
 // Affichage principal
 void updateMenuDisplay(); // Met à jour l'affichage selon l'écran courant (appelée dans loop)
 // Écrans spécifiques
-void showMainDataScreen();   // Affiche l'écran principal avec données batteries temps réel
-void showMenuScreen();       // Affiche le menu principal avec navigation
-void showCodeInputScreen();  // Affiche l'écran de saisie du code admin
-void showCodeResultScreen(); // Affiche le résultat de validation du code admin
-void showCanFramesScreen();  // Affiche les trames CAN en temps réel
-void showBrightnessScreen(); // Affiche l'écran de choix de luminosité
+void showMainDataScreen();      // Affiche l'écran principal avec données batteries temps réel
+void showMenuScreen();          // Affiche le menu principal avec navigation
+void showCodeInputScreen();     // Affiche l'écran de saisie du code admin
+void showCodeResultScreen();    // Affiche le résultat de validation du code admin
+void showCanFramesScreen();     // Affiche les trames CAN en temps réel
+void showBrightnessScreen();    // Affiche l'écran de choix de luminosité
+void showBatteryListScreen();   // Affiche la liste des batteries configurées
+void showBatteryDetailScreen(); // Affiche les détails de la batterie sélectionnée
 
 // ——————— GESTION MODE ADMIN ———————
 void activateAdminMode();   // Active le mode admin (ajoute items avancés au menu)

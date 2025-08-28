@@ -9,6 +9,8 @@ int selectedMenuItem = 0;
 int totalMenuItems = 0;
 int menuViewTop = 0;
 bool adminMode = false;
+int selectedBatteryIndex = 0;
+int selectedBatteryId = 0;
 int brightnessLevel = 3; // Niveau par défaut (1 à 5)
 // Tableau de correspondance: index 0 est ignoré, index 1=Niveau 1, etc.
 const uint8_t brightnessValues[] = {0, 1, 30, 80, 150, 255};
@@ -36,7 +38,6 @@ void buildMenu()
     // Items de base (utilisateur standard)
     menuItems[totalMenuItems++] = {"Afficher ID batteries", ACTION_DISPLAY_IDS, false};
     menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
-    menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, false};
     menuItems[totalMenuItems++] = {"Afficher trames CAN", ACTION_CAN_FRAMES, false};
     menuItems[totalMenuItems++] = {"Regler luminosite", ACTION_BRIGHTNESS, false};
     menuItems[totalMenuItems++] = {"Mode admin", ACTION_ADMIN_CODE, false};
@@ -45,6 +46,7 @@ void buildMenu()
     if (adminMode)
     {
         menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, true};
+        menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, true};
         menuItems[totalMenuItems++] = {"Parametres systeme", ACTION_SYSTEM_SETTINGS, true};
     }
 
@@ -85,6 +87,14 @@ void navigateMenuUp()
         }
         // MAIN_DATA : pas de navigation up/down
     }
+    else if (currentScreen == SCREEN_BATTERY_LIST)
+    {
+        extern int configuredBatteryCount; // On a besoin du nombre de batteries
+        if (configuredBatteryCount > 0)
+        {
+            selectedBatteryIndex = (selectedBatteryIndex - 1 + configuredBatteryCount) % configuredBatteryCount;
+        }
+    }
 }
 
 void navigateMenuDown()
@@ -105,6 +115,14 @@ void navigateMenuDown()
         {
             brightnessLevel--;
             setBrightness(brightnessValues[brightnessLevel]);
+        }
+    }
+    else if (currentScreen == SCREEN_BATTERY_LIST)
+    {
+        extern int configuredBatteryCount;
+        if (configuredBatteryCount > 0)
+        {
+            selectedBatteryIndex = (selectedBatteryIndex + 1) % configuredBatteryCount;
         }
     }
     // MAIN_DATA : pas de navigation up/down
@@ -143,6 +161,17 @@ void selectMenuItem()
         currentScreen = SCREEN_MENU;
         Serial.printf("Niveau de luminosité final: %d (valeur %d)\n", brightnessLevel, brightnessValues[brightnessLevel]);
     }
+    else if (currentScreen == SCREEN_BATTERY_LIST)
+    {
+        extern int configuredBatteryCount;
+        if (configuredBatteryCount > 0)
+        {
+            // On stocke l'ID de la batterie sélectionnée (index + 2)
+            Serial.printf("Choix detail de la batterie ");
+            selectedBatteryId = selectedBatteryIndex + 2;
+            currentScreen = SCREEN_BATTERY_DETAIL;
+        }
+    }
 }
 
 void goBackMenu()
@@ -179,6 +208,12 @@ void goBackMenu()
     case SCREEN_BRIGHTNESS:
         currentScreen = SCREEN_MENU;
         break;
+    case SCREEN_BATTERY_LIST:
+        currentScreen = SCREEN_MENU; // Retour de la liste vers le menu principal
+        break;
+    case SCREEN_BATTERY_DETAIL:
+        currentScreen = SCREEN_BATTERY_LIST; // Retour des détails vers la liste
+        break;
     }
 }
 
@@ -204,6 +239,12 @@ void updateMenuDisplay()
         break;
     case SCREEN_BRIGHTNESS:
         showBrightnessScreen();
+        break;
+    case SCREEN_BATTERY_LIST:
+        showBatteryListScreen();
+        break;
+    case SCREEN_BATTERY_DETAIL:
+        showBatteryDetailScreen();
         break;
     }
 }
@@ -300,6 +341,69 @@ void showCanFramesScreen()
     extern void showCanFrames();
     showCanFrames();
 }
+void showBatteryListScreen()
+{
+    extern int configuredBatteryCount;
+    clearDisplay();
+    drawTitle("DETAILS BATTERIES");
+
+    if (configuredBatteryCount == 0)
+    {
+        drawText(5, 35, "Aucune batterie");
+        drawText(5, 45, "configuree.");
+    }
+    else
+    {
+        // Affiche jusqu'à 4 batteries à la fois
+        for (int i = 0; i < configuredBatteryCount && i < 4; i++)
+        {
+            char line[20];
+            int battery_id = i + 2; // Les ID commencent à 2
+            sprintf(line, "Batterie ID %d", battery_id);
+
+            // Met en surbrillance l'item sélectionné
+            bool isSelected = (i == selectedBatteryIndex);
+            drawText(10, 25 + i * 10, line, false, isSelected);
+        }
+        // Dessine le curseur
+        drawMenuCursor(25 + selectedBatteryIndex * 10);
+    }
+    showDisplay();
+}
+
+void showBatteryDetailScreen()
+{
+    // On récupère les données de la batterie sélectionnée
+    // L'index dans le tableau est ID - 1
+    IndividualBatteryData *data = &individualBatteryMetrics[selectedBatteryId - 1];
+
+    clearDisplay();
+    char title[20];
+    sprintf(title, "DETAILS ID %d", selectedBatteryId);
+    drawTitle(title);
+
+    if (!data->isValid)
+    {
+        drawText(5, 35, "Donnees invalides...");
+    }
+    else
+    {
+        char line[32];
+        sprintf(line, "V: %.2fV", data->voltage);
+        drawText(5, 25, line);
+        sprintf(line, "I: %.2fA", data->current);
+        drawText(70, 25, line);
+
+        sprintf(line, "SOC: %.1f%%", data->soc);
+        drawText(5, 35, line);
+
+        sprintf(line, "T1:%.1fC T2:%.1fC", data->temp1, data->temp2);
+        drawText(5, 45, line);
+    }
+
+    showDisplay();
+}
+
 // ——————— FONCTIONS UTILITAIRES ———————
 
 void adjustMenuView()
@@ -343,7 +447,8 @@ void executeMenuAction(int idx)
         actionShowErrors();
         break;
     case ACTION_INDIVIDUAL:
-        actionIndividualBatteries();
+        selectedBatteryIndex = 0;
+        currentScreen = SCREEN_BATTERY_LIST;
         break;
     case ACTION_SYSTEM_SETTINGS:
         actionSystemSettings();
