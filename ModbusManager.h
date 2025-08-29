@@ -21,6 +21,7 @@ struct IndividualBatteryData
     float temp2;
     float mosTemp;
     uint16_t heartbeat;
+    float currentLimit;
     float cellVoltages[16]; // Conçu pour 16 cellules, à ajuster si besoin.
     float cellVoltageDifference;
     // Les autres données (volt diff, S/N, etc.) ne sont pas dans les registres standards.

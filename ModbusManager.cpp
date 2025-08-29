@@ -88,7 +88,7 @@ void updateIndividualBatteryMetrics(uint8_t batteryId)
     batteryData->isValid = false;
 
     const uint16_t startAddr = 0x00;
-    const uint16_t endAddr = REG_MOS_TEMP; // 0x5A
+    const uint16_t endAddr = 0x60;
     const uint16_t regCount = endAddr - startAddr + 1;
     uint8_t payload[regCount * 2]; // Buffer assez grand pour toutes les données
 
@@ -133,6 +133,10 @@ void updateIndividualBatteryMetrics(uint8_t batteryId)
         // Température MOS
         int mosTempOffset = (REG_MOS_TEMP - startAddr) * 2;
         batteryData->mosTemp = (((payload[mosTempOffset] << 8) | payload[mosTempOffset + 1])) - 40.0f;
+
+        // Limite de courant
+        const int limitOffset = (0x60 - startAddr) * 2;
+        batteryData->currentLimit = (((int16_t)((payload[limitOffset] << 8) | payload[limitOffset + 1])) - 30000) * 0.1f;
 
         batteryData->isValid = true;
         Serial.printf("INFO: Données détaillées de la batterie ID=%d mises à jour.\n", batteryId);
