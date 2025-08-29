@@ -59,8 +59,5 @@ bool changeAllBatteriesToId1();
 bool changeBatteryIdFrom1To(uint8_t newId);
 
 // --- FONCTIONS UTILITAIRES MODBUS ---
-// Attend et vérifie la réception d'un ACK d'une batterie
-bool waitForAck(uint8_t batteryId, const char *operation);
-// DEBUG
 void printIndividualBatteryData(uint8_t batteryId);
 #endif

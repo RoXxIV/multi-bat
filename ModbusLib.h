@@ -75,4 +75,33 @@ void modbus_print_buffer(const char *label, uint8_t *buffer, int length);
  */
 uint16_t calculateCRC16(uint8_t *data, uint8_t length);
 
+/**
+ * @brief Exécute une transaction Modbus de lecture complète (envoi + réception + validation).
+ * @param slave_id L'ID de l'esclave à interroger.
+ * @param start_addr L'adresse du premier registre à lire.
+ * @param reg_count Le nombre de registres à lire.
+ * @param dest_buffer Le buffer où seront stockées les données utiles de la réponse.
+ * @return Le nombre d'octets de données reçus, ou -1 en cas d'erreur (timeout, CRC...).
+ */
+int modbus_read_registers(uint8_t slave_id, uint16_t start_addr, uint16_t reg_count, uint8_t *dest_buffer);
+
+/**
+ * @brief Exécute une transaction Modbus d'écriture d'un seul registre.
+ * @param slave_id L'ID de l'esclave.
+ * @param reg_addr L'adresse du registre à écrire.
+ * @param value La valeur de 16 bits à écrire.
+ * @return true si l'écriture a été confirmée par un ACK, false sinon.
+ */
+bool modbus_write_register(uint8_t slave_id, uint16_t reg_addr, uint16_t value);
+
+/**
+ * @brief Exécute une transaction Modbus d'écriture de registres multiples.
+ * @param slave_id L'ID de l'esclave.
+ * @param start_addr L'adresse du premier registre à écrire.
+ * @param reg_count Le nombre de registres à écrire.
+ * @param data Pointeur vers un tableau d'octets contenant les données à écrire.
+ * @return true si l'écriture a été confirmée par un ACK, false sinon.
+ */
+bool modbus_write_multiple_registers(uint8_t slave_id, uint16_t start_addr, uint16_t reg_count, uint8_t *data);
+
 #endif
