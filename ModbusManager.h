@@ -22,6 +22,7 @@ struct IndividualBatteryData
     float mosTemp;
     uint16_t heartbeat;
     float cellVoltages[16]; // Conçu pour 16 cellules, à ajuster si besoin.
+    float cellVoltageDifference;
     // Les autres données (volt diff, S/N, etc.) ne sont pas dans les registres standards.
 };
 // Structure pour stocker les données consolidées de l'ensemble du parc de batteries.

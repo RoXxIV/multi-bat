@@ -11,6 +11,7 @@ int menuViewTop = 0;
 bool adminMode = false;
 int selectedBatteryIndex = 0;
 int selectedBatteryId = 0;
+int detailViewTop = 0;
 int brightnessLevel = 3; // Niveau par défaut (1 à 5)
 // Tableau de correspondance: index 0 est ignoré, index 1=Niveau 1, etc.
 const uint8_t brightnessValues[] = {0, 1, 30, 80, 150, 255};
@@ -95,6 +96,13 @@ void navigateMenuUp()
             selectedBatteryIndex = (selectedBatteryIndex - 1 + configuredBatteryCount) % configuredBatteryCount;
         }
     }
+    else if (currentScreen == SCREEN_BATTERY_DETAIL)
+    {
+        if (detailViewTop > 0)
+        {
+            detailViewTop--;
+        }
+    }
 }
 
 void navigateMenuDown()
@@ -123,6 +131,17 @@ void navigateMenuDown()
         if (configuredBatteryCount > 0)
         {
             selectedBatteryIndex = (selectedBatteryIndex + 1) % configuredBatteryCount;
+        }
+    }
+    else if (currentScreen == SCREEN_BATTERY_DETAIL)
+    {
+        // Le nombre total de lignes de données est 7. On peut en afficher 4 à la fois.
+        // On peut donc scroller jusqu'à ce que la 4ème ligne visible soit la dernière (index 6).
+        // La position max du scroll est donc 7 - 4 = 3.
+        const int MAX_SCROLL = 3;
+        if (detailViewTop < MAX_SCROLL)
+        {
+            detailViewTop++;
         }
     }
     // MAIN_DATA : pas de navigation up/down
@@ -170,6 +189,7 @@ void selectMenuItem()
             Serial.printf("Choix detail de la batterie ");
             selectedBatteryId = selectedBatteryIndex + 2;
             currentScreen = SCREEN_BATTERY_DETAIL;
+            detailViewTop = 0;
         }
     }
 }
@@ -374,8 +394,6 @@ void showBatteryListScreen()
 
 void showBatteryDetailScreen()
 {
-    // On récupère les données de la batterie sélectionnée
-    // L'index dans le tableau est ID - 1
     IndividualBatteryData *data = &individualBatteryMetrics[selectedBatteryId - 1];
 
     clearDisplay();
@@ -389,17 +407,38 @@ void showBatteryDetailScreen()
     }
     else
     {
-        char line[32];
-        sprintf(line, "V: %.2fV", data->voltage);
-        drawText(5, 25, line);
-        sprintf(line, "I: %.2fA", data->current);
-        drawText(70, 25, line);
+        // On prépare toutes nos lignes de données dans un tableau
+        const int TOTAL_LINES = 7;
+        char lines[TOTAL_LINES][32];
 
-        sprintf(line, "SOC: %.1f%%", data->soc);
-        drawText(5, 35, line);
+        sprintf(lines[0], "V: %.2fV  I: %.2fA", data->voltage, data->current);
+        sprintf(lines[1], "SOC: %.1f%%", data->soc);
+        sprintf(lines[2], "T1: %.1fC  T2: %.1fC", data->temp1, data->temp2);
+        sprintf(lines[3], "Diff cells: %.3fV", data->cellVoltageDifference);
+        sprintf(lines[4], "S/N: %.14s", data->serialNumber);      // 1ère moitié
+        sprintf(lines[5], "     %.14s", data->serialNumber + 14); // 2ème moitié
+        sprintf(lines[6], "MOSFET Ch:%s Dch:%s", data->chargeMosfetStatus ? "ON" : "OFF", data->dischargeMosfetStatus ? "ON" : "OFF");
 
-        sprintf(line, "T1:%.1fC T2:%.1fC", data->temp1, data->temp2);
-        drawText(5, 45, line);
+        // On affiche seulement la "fenêtre" visible (4 lignes)
+        const int VISIBLE_LINES = 4;
+        for (int i = 0; i < VISIBLE_LINES; i++)
+        {
+            int line_index = detailViewTop + i;
+            if (line_index < TOTAL_LINES)
+            {
+                drawText(5, 25 + i * 10, lines[line_index]);
+            }
+        }
+
+        // Ajout des indicateurs de scroll si nécessaire
+        if (detailViewTop > 0)
+        {
+            drawText(120, 25, "^"); // Flèche vers le haut
+        }
+        if (detailViewTop < (TOTAL_LINES - VISIBLE_LINES))
+        {
+            drawText(120, 55, "v"); // Flèche vers le bas
+        }
     }
 
     showDisplay();

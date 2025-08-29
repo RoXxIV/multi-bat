@@ -26,6 +26,7 @@ extern int menuViewTop;          // Index du premier item visible dans le menu
 extern bool adminMode;           // État du mode administrateur (débloque items avancés)
 extern int selectedBatteryIndex; // Index dans la liste des batteries (0, 1, 2...)
 extern int selectedBatteryId;    // ID de la batterie choisie (2, 3, 4...)
+extern int detailViewTop;
 // Menu items
 extern MenuItem menuItems[MAX_MENU_ITEMS]; // Tableau des items de menu avec texte et actions
 // Variables pour le code admin

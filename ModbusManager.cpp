@@ -198,6 +198,10 @@ void updateIndividualBatteryMetrics(uint8_t batteryId)
             int mosTempOffset = (REG_MOS_TEMP - startAddr) * 2;
             batteryData->mosTemp = (((data[mosTempOffset] << 8) | data[mosTempOffset + 1])) - 40.0f;
 
+            // On suppose que la valeur est en mV, donc on divise par 1000.0 pour obtenir des Volts.
+            const int diffOffset = (0x42 - startAddr) * 2;
+            batteryData->cellVoltageDifference = ((data[diffOffset] << 8) | data[diffOffset + 1]) / 1000.0f;
+
             batteryData->isValid = true;
             Serial.printf("INFO: Données détaillées de la batterie ID=%d mises à jour.\n", batteryId);
         }
