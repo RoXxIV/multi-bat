@@ -15,23 +15,22 @@
 #include "ModbusManager.h"
 #include "CanBusManager.h"
 #include "NvsManager.h"
+#include "BatteryLogic.h"
 
 // ——————— OBJETS MATÉRIELS ———————
-HardwareSerial modbusSerial(2); // Port serie pour la communication Modbus
-// Instance de l'écran OLED 128x64 I2C
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET);
-
+HardwareSerial modbusSerial(2);                                                           // Port serie pour la communication Modbus
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET); // Instance de l'écran OLED 128x64 I2C
 // ——————— VARIABLES DE TIMING ———————
 unsigned long lastDisplayUpdate = 0; // Timestamps pour contrôler la fréquence des mises à jour
 //  Intervalles de mise à jour
-#define DISPLAY_UPDATE_INTERVAL 500 // Rafraîchissement écran(ms)
+#define DISPLAY_UPDATE_INTERVAL 500                            // Rafraîchissement écran(ms) - 2 fois par seconde
+unsigned long lastMetricsUpdate = 0;                           // Timestamps pour contrôler la fréquence des mises à jour
+const long METRICS_UPDATE_INTERVAL = 10000;                    // 10 secondes
+AggregateBatteryMetrics latestMetrics;                         // Datas de toutes les batteries
+IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES]; // Datas individuelles de chaque batterie
+unsigned long lastActivityTime = 0;                            // Variable globale pour la gestion de l'inactivité
+int configuredBatteryCount = 0;                                // Nombre de batteries configurées par l'utilisateur
 
-unsigned long lastMetricsUpdate = 0;
-const long METRICS_UPDATE_INTERVAL = 10000; // 10 secondes
-AggregateBatteryMetrics latestMetrics;
-IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
-unsigned long lastActivityTime = 0; // Variable globale pour la gestion de l'inactivité
-int configuredBatteryCount = 0;     // Nombre de batteries configurées par l'utilisateur
 // ——————— INITIALISATION SYSTÈME ———————
 void setup()
 {
@@ -41,19 +40,21 @@ void setup()
   initNvs();                                   // Initialisation de la NVS
   configuredBatteryCount = loadBatteryCount(); // Chargement du nombre de batteries configurées
   Serial.printf("INFO: %d batterie(s) configurée(s) au démarrage.\n", configuredBatteryCount);
-
   initDisplay(&u8g2);                               // Initialisation de l'écran OLED
   setBrightness(brightnessValues[brightnessLevel]); // Initialiser la luminosité avec la valeur par défaut
-
   // Initialisation des boutons de navigation avec anti-rebond
   initButtons(BTN_UP_PIN, BTN_DOWN_PIN, BTN_OK_PIN, BTN_BACK_PIN);
   setDebounceDelay(DEBOUNCE_DELAY);
-
-  initModbus(); // Initialisation de la communication Modbus RS485 avec les batteries
-
+  initModbus();      // Initialisation de la communication Modbus RS485 avec les batteries
+  if (!initCanBus()) // Initialisation du bus CAN
+  {
+    Serial.println("ERREUR: Impossible d'initialiser le CAN Bus!");
+  }
   lastActivityTime = millis(); // Initialiser le timer
-
-  initMenu(); // Initialisation du système de menus
+  initMenu();                  // Initialisation du système de menus
+  initBatteryManagement();     // Initialisation de la gestion des batteries
+  initStatusLeds();            // Initialisation des LEDs de statut
+  Serial.println("✓ Système de gestion batteries initialisé");
 
   // Si aucune batterie n'est configurée (premier démarrage),
   // on lance directement le processus d'appairage.
@@ -89,9 +90,7 @@ void setup()
 void loop()
 {
   unsigned long now = millis();
-
-  updateButtons(); // Mise à jour de l'état de tous les boutons (anti-rebond inclus)
-
+  updateButtons();      // Mise à jour de l'état de tous les boutons (anti-rebond inclus)
   handleButtonEvents(); // Traitement des événements boutons
 
   // Vérifier l'inactivité pour éteindre l'écran
@@ -107,21 +106,44 @@ void loop()
     lastDisplayUpdate = now;
   }
 
+  monitorBatteryConnections(); // Surveillance continue des connexions
+
   // Mise à jour des données globales des batteries
   if (now - lastMetricsUpdate >= METRICS_UPDATE_INTERVAL)
   {
     lastMetricsUpdate = now;
-    // On appelle la nouvelle fonction avec le nombre de batteries sauvegardé en NVS
-    readAggregateBatteryMetrics(configuredBatteryCount, &latestMetrics);
+    Serial.println("\n=== CYCLE DE LECTURE BATTERIES ===");
+    readAggregateBatteryMetrics(configuredBatteryCount, &latestMetrics); // Lecture des données agrégées
 
     for (int i = 0; i < configuredBatteryCount; i++)
     {
       uint8_t currentBatteryId = i + 2;
       updateIndividualBatteryMetrics(currentBatteryId);
+      // Mise à jour de l'état de la batterie
+      // Considérer qu'une batterie répond si ses données sont valides
+      bool responding = individualBatteryMetrics[i + 1].isValid;
+      updateBatteryState(i, responding);
+      // Debug
       printIndividualBatteryData(currentBatteryId);
       delay(250); // Petite pause pour ne pas surcharger le bus
     }
+    updateVoltageDeltas();         // Calcul des deltas de tension
+    checkMosfetStatus();           // Vérification MOSFETs
+    checkDegradedModeConditions(); // Vérification conditions mode dégradé
+    updateSystemMetrics();         // Mise à jour des métriques système
+    runBatteryManagementCycle();   // Gestion intelligente des batteries
+
+    // Calcul des consignes
+    currentChargeSetpoint = calculateChargeSetpoint();
+    currentDischargeSetpoint = calculateDischargeSetpoint();
+
+    printSystemStatus(); // Affichage de l'état système
+
+    // Mise à jour des consignes CAN avec les valeurs calculées
+    setChargeCurrentSetpoint(currentChargeSetpoint);
+    setDischargeCurrentSetpoint(currentDischargeSetpoint);
   }
+  sendCanData();
 }
 
 // ——————— GESTION DES ÉVÉNEMENTS BOUTONS ———————

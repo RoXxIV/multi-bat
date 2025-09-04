@@ -9,6 +9,10 @@
 #define OLED_SCL_PIN 22          // Pin horloge I2C
 #define OLED_RESET U8X8_PIN_NONE // Pin reset materiel (non utilisé)
 
+// Pins des LEDs d'état
+#define LED_RED_PIN 26    // LED rouge alarme
+#define LED_YELLOW_PIN 27 // LED jaune
+
 // Configuration boutons de navigation
 #define BTN_UP_PIN 39   // Bouton haut
 #define BTN_DOWN_PIN 34 // Bouton bas
@@ -39,6 +43,36 @@
 #define MODBUS_CONFIG SERIAL_8E1 // Format série : 8 bits, parité paire, 1 stop
 #define MAX_BATTERIES 9          // Nombre maximum de batteries supportées
 #define MASTER_ADDR 0x81         // Adresse Modbus du maître (ESP32)
+
+// ——————— SEUILS DE GESTION BATTERIES ———————
+// Seuils de tension des batteries
+#define VOLTAGE_DIFF_THRESHOLD 0.4f        // Seuil différence tension batteries (V)
+#define VOLTAGE_DIFF_COUPLE_THRESHOLD 0.3f // Seuil pour couplage batteries (V)
+#define VOLTAGE_TOLERANCE 0.3f             // Tolérance tension pour MOSFETs (V)
+
+// Seuils de température
+#define TEMP_DIFF_THRESHOLD 10.0f // Seuil différence température batteries (°C)
+#define MIN_CHARGE_TEMP 8.0f      // Température min pour charge normale (°C)
+#define MAX_CHARGE_TEMP 45.0f     // Température max pour charge normale (°C)
+#define MIN_DISCHARGE_TEMP 3.0f   // Température min pour décharge normale (°C)
+#define MAX_DISCHARGE_TEMP 50.0f  // Température max pour décharge normale (°C)
+#define MAX_MOS_TEMP 80.0f        // Température max MOSFETs (°C)
+
+// Seuils de tension des cellules
+#define MAX_CHARGE_CELL_VOLTAGE 3.480f    // Tension max cellule - arrêt charge (V)
+#define HIGH_CHARGE_CELL_VOLTAGE 3.450f   // Tension haute cellule - limitation charge (V)
+#define LOW_CELL_VOLTAGE 3.000f           // Tension basse cellule - limitation charge/décharge (V)
+#define MIN_DISCHARGE_CELL_VOLTAGE 2.750f // Tension min cellule - arrêt décharge (V)
+#define CELL_DIFF_THRESHOLD 0.250f        // Seuil différence tension cellules - mode dégradé (V)
+
+// Consignes de courant
+#define DEGRADED_MODE_CURRENT 10.0f       // Courant en mode dégradé (A)
+#define NORMAL_CURRENT_PER_BATTERY 150.0f // Courant normal par batterie (A)
+#define LIMITED_CURRENT_PER_BATTERY 10.0f // Courant limité par batterie (A)
+
+// Timeouts et temporisations
+#define BATTERY_RESPONSE_TIMEOUT 5000        // Timeout réponse batterie (ms)
+#define MOSFET_RECOVERY_CHECK_INTERVAL 30000 // Intervalle vérification récupération MOSFET (ms)
 
 // ——————— ÉNUMÉRATIONS ———————
 // Types de boutons du système
@@ -75,6 +109,25 @@ enum MenuActions
     ACTION_BRIGHTNESS = 8       // Action pour régler la luminosité
 };
 
+enum LimitationType
+{
+    NO_LIMITATION = 0,           // Aucune limitation
+    MOSFET_LIMITATION = 1,       // Limitation due aux MOSFETs
+    VOLTAGE_LIMITATION = 2,      // Limitation due aux tensions
+    TEMP_LIMITATION = 3,         // Limitation due aux températures
+    DEGRADED_MODE_LIMITATION = 4 // Limitation mode dégradé
+};
+
+enum BatteryStatus
+{
+    BATTERY_OK = 0,             // Batterie fonctionnelle
+    BATTERY_NOT_RESPONDING = 1, // Batterie ne répond pas
+    BATTERY_MOSFET_ISSUE = 2,   // Problème MOSFET
+    BATTERY_TEMP_ISSUE = 3,     // Problème température
+    BATTERY_VOLTAGE_ISSUE = 4,  // Problème tension
+    BATTERY_CELL_IMBALANCE = 5  // Déséquilibre cellules
+};
+
 // ——————— STRUCTURES DE DONNÉES ———————
 // Structure d'état d'un bouton physique
 struct ButtonState
@@ -90,6 +143,32 @@ struct MenuItem
     const char *text; // Texte affiché dans le menu
     int action;       // Action à exécuter (enum MenuActions)
     bool isAdminOnly; // Visible uniquement en mode admin
+};
+
+// ——————— STRUCTURES POUR LA GESTION DES BATTERIES ———————
+// Structure d'état d'une batterie individuelle
+struct BatteryState
+{
+    bool isResponding;               // Batterie répond aux commandes Modbus
+    unsigned long lastResponseTime;  // Timestamp dernière réponse valide
+    BatteryStatus status;            // État actuel de la batterie
+    LimitationType activeLimitation; // Type de limitation active
+    bool isActive;                   // Batterie actuellement active dans le système
+    float voltageDelta;              // Différence avec tension max du pack
+    unsigned long lastMosfetCheck;   // Timestamp dernière vérification MOSFET
+};
+
+// Structure de diagnostic système global
+struct SystemDiagnostics
+{
+    bool degradedMode;            // Mode dégradé actif
+    int activeBatteryCount;       // Nombre de batteries actives
+    int respondingBatteryCount;   // Nombre de batteries qui répondent
+    float maxBatteryVoltage;      // Tension max parmi toutes les batteries
+    float minBatteryVoltage;      // Tension min parmi toutes les batteries
+    float maxBatteryTemp;         // Température max parmi toutes les batteries
+    float minBatteryTemp;         // Température min parmi toutes les batteries
+    unsigned long lastDiagnostic; // Timestamp dernier diagnostic
 };
 
 #endif

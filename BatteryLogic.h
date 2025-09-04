@@ -1,0 +1,193 @@
+#ifndef BATTERY_LOGIC_H
+#define BATTERY_LOGIC_H
+
+#include "Config.h"
+#include "ModbusManager.h"
+
+// ——————— VARIABLES GLOBALES ———————
+extern BatteryState batteryStates[MAX_BATTERIES];
+extern SystemDiagnostics systemDiag;
+extern float currentChargeSetpoint;
+extern float currentDischargeSetpoint;
+extern int activeBatteryCount;
+extern int respondingBatteryCount;
+extern bool degradedMode;
+extern bool systemInitialized;
+
+// ——————— INITIALISATION ET SYSTÈME ———————
+/**
+ * @brief Initialise toutes les structures de gestion des batteries
+ * À appeler dans setup() après les initialisations existantes
+ */
+void initBatteryManagement();
+
+/**
+ * @brief Fonction principale de gestion des batteries
+ * Orchestre toute la logique intelligente
+ */
+void runBatteryManagementCycle();
+
+/**
+ * @brief Affiche l'état complet du système pour debug
+ */
+void printSystemStatus();
+
+/**
+ * @brief Met à jour les métriques globales du système
+ * À appeler après chaque lecture des données batteries
+ */
+void updateSystemMetrics();
+
+// ——————— GESTION DES CONNEXIONS ET SURVEILLANCE ———————
+/**
+ * @brief Surveille en continu les connexions des batteries
+ * À appeler dans loop() principal
+ */
+void monitorBatteryConnections();
+
+/**
+ * @brief Vérifie quelles batteries répondent aux commandes Modbus
+ * @return Nombre de batteries répondantes
+ */
+int checkBatteryConnections();
+
+/**
+ * @brief Met à jour l'état d'une batterie individuelle
+ * @param batteryIndex Index de la batterie (0-based)
+ * @param isResponding true si la batterie répond
+ */
+void updateBatteryState(int batteryIndex, bool isResponding);
+
+// ——————— DIAGNOSTIC ET DÉTECTION DES PANNES ———————
+/**
+ * @brief Vérifie l'état des MOSFETs de toutes les batteries
+ * @return true si au moins un MOSFET a un problème
+ */
+bool checkMosfetStatus();
+
+/**
+ * @brief Vérifie si une batterie peut récupérer d'un problème MOSFET
+ * @param batteryIndex Index de la batterie à vérifier
+ * @return true si la récupération est possible
+ */
+bool checkMosfetRecoveryConditions(int batteryIndex);
+
+/**
+ * @brief Vérifie les conditions d'activation du mode dégradé
+ * @return true si le mode dégradé doit être activé
+ */
+bool checkDegradedModeConditions();
+
+/**
+ * @brief Vérifie si le système peut sortir du mode dégradé
+ * @return true si sortie possible
+ */
+bool checkCanExitDegradedMode();
+
+// ——————— GESTION MODE DÉGRADÉ ———————
+/**
+ * @brief Active le mode dégradé avec les limitations associées
+ * @param reason Raison de l'activation (pour logs)
+ */
+void enableDegradedMode(const char *reason);
+
+/**
+ * @brief Désactive le mode dégradé si les conditions le permettent
+ */
+void disableDegradedMode();
+
+// ——————— GESTION DES BATTERIES ACTIVES ———————
+/**
+ * @brief Gère l'activation/désactivation des batteries selon les deltas de tension
+ */
+void manageBatteryActivation();
+
+/**
+ * @brief Vérifie si une batterie peut être activée (conditions complémentaires)
+ * @param batteryIndex Index de la batterie à vérifier
+ * @return true si activation possible
+ */
+bool checkBatteryCanBeActivated(int batteryIndex);
+
+/**
+ * @brief Met à jour les deltas de tension par rapport à la batterie la plus haute
+ */
+void updateVoltageDeltas();
+
+/**
+ * @brief Applique les limitations de courant aux batteries si nécessaire
+ */
+void manageBatteryLimitations();
+
+// ——————— CALCUL DES CONSIGNES ———————
+/**
+ * @brief Calcule la consigne de charge selon les conditions actuelles
+ * @return Consigne de charge en Ampères
+ */
+float calculateChargeSetpoint();
+
+/**
+ * @brief Calcule la consigne de décharge selon les conditions actuelles
+ * @return Consigne de décharge en Ampères
+ */
+float calculateDischargeSetpoint();
+
+// ——————— MOYENNES ET AGRÉGATION ———————
+/**
+ * @brief Calcule les moyennes SOC, SOH, tension et températures
+ * Met à jour la structure latestMetrics
+ */
+void calculateAverages();
+
+/**
+ * @brief Met à jour les données CAN avec les valeurs moyennes calculées
+ * @param metrics Structure des métriques agrégées
+ * @param avgMosTemp Température moyenne des MOSFETs
+ */
+void updateCanDataWithAverages(const AggregateBatteryMetrics &metrics, float avgMosTemp);
+
+/**
+ * @brief Calcule les alarmes système pour les trames CAN
+ * @return Byte d'alarmes selon l'état du système
+ */
+uint8_t calculateSystemAlarms();
+
+/**
+ * @brief Calcule les protections système pour les trames CAN
+ * @return Byte de protections selon l'état du système
+ */
+uint8_t calculateSystemProtections();
+
+// ——————— FONCTIONS UTILITAIRES ———————
+/**
+ * @brief Trouve la batterie avec la tension la plus élevée
+ * @return Index de la batterie (-1 si aucune trouvée)
+ */
+int findHighestVoltageBattery();
+
+/**
+ * @brief Vérifie si une tension de cellule est dans les limites acceptables
+ * @param cellVoltage Tension de la cellule en volts
+ * @return true si la tension est acceptable
+ */
+bool isCellVoltageValid(float cellVoltage);
+
+/**
+ * @brief Vérifie si une température est dans les limites acceptables
+ * @param temperature Température en °C
+ * @param isCharging true si la batterie est en charge
+ * @return true si la température est acceptable
+ */
+bool isTemperatureValid(float temperature, bool isCharging);
+
+// ——————— GESTION DES LEDS D'ÉTAT ———————
+/**
+ * @brief Initialise les LEDs d'état du système
+ */
+void initStatusLeds();
+
+/**
+ * @brief Met à jour l'état des LEDs selon les conditions système
+ */
+void updateStatusLeds();
+#endif
