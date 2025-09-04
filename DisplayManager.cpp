@@ -1,6 +1,8 @@
 #include "DisplayManager.h"
 #include "ModbusManager.h"
 #include "CanBusManager.h"
+#include "BatteryLogic.h"
+
 // ——————— VARIABLE GLOBALE ———————
 U8G2 *display_u8g2 = nullptr;
 bool isScreenOn = true;
@@ -102,24 +104,23 @@ void showMainData()
         float current = latestMetrics.totalCurrent;
 
         // Trouver les températures max T1 et T2
-        float maxT1 = -100.0f;
-        float maxT2 = -100.0f;
+        float totalTemp = 0.0f;
+        int validTempCount = 0;
         for (int i = 0; i < configuredBatteryCount; i++)
         {
             if (individualBatteryMetrics[i + 1].isValid)
             {
-                if (individualBatteryMetrics[i + 1].temp1 > maxT1)
-                    maxT1 = individualBatteryMetrics[i + 1].temp1;
-                if (individualBatteryMetrics[i + 1].temp2 > maxT2)
-                    maxT2 = individualBatteryMetrics[i + 1].temp2;
+                // On ajoute la température moyenne de cette batterie
+                totalTemp += (individualBatteryMetrics[i + 1].temp1 + individualBatteryMetrics[i + 1].temp2) / 2.0f;
+                validTempCount++;
             }
         }
 
-        // Calculer la moyenne des températures batteries
-        float avgBatteryTemp = (maxT1 + maxT2) / 2.0f;
+        // On calcule la moyenne générale
+        float avgBatteryTemp = (validTempCount > 0) ? (totalTemp / validTempCount) : 0.0f;
 
-        float chargeSetpoint = getChargeCurrentSetpoint();
-        float dischargeSetpoint = getDischargeCurrentSetpoint();
+        float chargeSetpoint = currentChargeSetpoint;
+        float dischargeSetpoint = currentDischargeSetpoint;
 
         char line[32];
 

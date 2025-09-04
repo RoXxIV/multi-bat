@@ -5,17 +5,10 @@
 // ——————— VARIABLES GLOBALES ———————
 CanFrame canFrame;
 unsigned long lastCanSend = 0;
-
-// Variables de consignes (mode dégradé)
-float chargeCurrentSetpoint = 10.0;    // 10A
-float dischargeCurrentSetpoint = 10.0; // 10A
-
-// Variables pour affichage des trames
-char lastCanFrames[5][50];
-bool canDisplayActive = false;
+char lastCanFrames[5][50];     // Stockage texte des trames pour affichage
+bool canDisplayActive = false; // État affichage temps réel des trames
 
 // ——————— FONCTIONS D'INITIALISATION ———————
-
 bool initCanBus()
 {
     Serial.println("Initialisation CAN Bus...");
@@ -35,46 +28,12 @@ bool initCanBus()
 
     Serial.printf("CAN Bus initialisé - Speed: %d kbps, TX: %d, RX: %d\n",
                   CAN_SPEED_KBPS, CAN_TX_PIN, CAN_RX_PIN);
-    Serial.printf("Consignes initiales: Charge=%.1fA, Décharge=%.1fA\n",
-                  chargeCurrentSetpoint, dischargeCurrentSetpoint);
     return true;
 }
 
-// ——————— CONTRÔLE DES CONSIGNES ———————
+// ——————— CONTRÔLE DES CONSIGNES DE COURANT ———————
 
-void setChargeCurrentSetpoint(float currentA)
-{
-    if (currentA < 0)
-        currentA = 0;
-    if (currentA > MAX_CHARGE_CURRENT_A)
-        currentA = MAX_CHARGE_CURRENT_A;
-
-    chargeCurrentSetpoint = currentA;
-    Serial.printf("Consigne charge mise à jour: %.1fA\n", currentA);
-}
-
-void setDischargeCurrentSetpoint(float currentA)
-{
-    if (currentA < 0)
-        currentA = 0;
-    if (currentA > MAX_DISCHARGE_CURRENT_A)
-        currentA = MAX_DISCHARGE_CURRENT_A;
-
-    dischargeCurrentSetpoint = currentA;
-    Serial.printf("Consigne décharge mise à jour: %.1fA\n", currentA);
-}
-
-float getChargeCurrentSetpoint()
-{
-    return chargeCurrentSetpoint;
-}
-
-float getDischargeCurrentSetpoint()
-{
-    return dischargeCurrentSetpoint;
-}
-
-// ——————— FONCTIONS PRINCIPALES ———————
+// ——————— ENVOI DES TRAMES CAN ———————
 
 bool shouldSendCan()
 {
@@ -97,20 +56,15 @@ void sendCanData()
     sendAlarms();             // 0x359
     sendRequests();           // 0x35C
 
-    // ⭐ Mettre à jour l'affichage des trames si actif
+    // Mettre à jour l'affichage des trames si actif
     if (canDisplayActive)
     {
         updateCanFrameDisplay();
     }
-    // Serial.println("Trames CAN envoyées");
 }
-
-// ——————— ENVOI DE TRAMES SPÉCIFIQUES ———————
 
 void sendChargeLimits()
 {
-    // Données Brutes : 04 02 64 00 64 00 C9 01
-
     canFrame = {0};
     canFrame.identifier = CAN_ID_LIMITS;
     canFrame.extd = 0;
@@ -120,8 +74,8 @@ void sendChargeLimits()
     uint16_t vchg = 516;
 
     // Courants en 0.1A (consignes variables 0-600A)
-    uint16_t ichg = (uint16_t)(chargeCurrentSetpoint * 10);    // x10 pour 0.1A
-    uint16_t idis = (uint16_t)(dischargeCurrentSetpoint * 10); // x10 pour 0.1A
+    uint16_t ichg = (uint16_t)(currentChargeSetpoint * 10);
+    uint16_t idis = (uint16_t)(currentDischargeSetpoint * 10);
 
     // Format little-endian selon la doc
     canFrame.data[0] = lowByte(vchg);  // 0x04
@@ -134,20 +88,18 @@ void sendChargeLimits()
     canFrame.data[7] = 0x01;           // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    /*Serial.printf("CAN 0x351: V=51.6V, Ich=%.1fA, Idch=%.1fA\n",
-                  chargeCurrentSetpoint, dischargeCurrentSetpoint);*/
+    Serial.printf("CAN 0x351: V=51.6V, Ich=%.1fA, Idch=%.1fA\n",
+                  currentChargeSetpoint, currentDischargeSetpoint);
 }
 
 void sendSocSoh()
 {
-    // Données Brutes : 14 00 64 00 D0 07 00 00
-
     canFrame = {0};
     canFrame.identifier = CAN_ID_SOC_SOH;
     canFrame.extd = 0;
     canFrame.data_length_code = 8;
 
-    // SOC DYNAMIQUE: Utiliser la moyenne calculée des batteries
+    // SOC DYNAMIQUE: Utilise la moyenne calculée des batteries
     extern AggregateBatteryMetrics latestMetrics;
     uint16_t soc = 0;
 
@@ -183,8 +135,6 @@ void sendSocSoh()
 
 void sendVoltageCurrentTemp()
 {
-    // Données Brutes : 68 10 00 00 0E 01 00 00
-
     canFrame = {0};
     canFrame.identifier = CAN_ID_VOLTAGE_CURRENT;
     canFrame.extd = 0;
@@ -196,6 +146,8 @@ void sendVoltageCurrentTemp()
     uint16_t voltage = 4200; // 42.00V en 0.01V
     uint16_t current = 0;    // 0.0A
     uint16_t temp = 270;     // 27.0°C en 0.1°C
+
+    extern AggregateBatteryMetrics latestMetrics;
 
     if (latestMetrics.isDataValid)
     {
@@ -240,7 +192,6 @@ void sendAlarms()
     canFrame.extd = 0;
     canFrame.data_length_code = 8;
 
-    // ⭐ UTILISER LES FONCTIONS EXISTANTES DE BatteryLogic.cpp
     uint8_t protections = calculateSystemProtections();
     uint8_t alarms = calculateSystemAlarms();
 
@@ -265,7 +216,6 @@ void sendAlarms()
 
 void sendRequests()
 {
-    // FORMAT EXACT SELON CONSIGNE
     // Données Brutes : C0 00 00 00 00 00 00 00
 
     canFrame = {0};
@@ -283,16 +233,15 @@ void sendRequests()
     canFrame.data[7] = 0x00; // Réservé
 
     ESP32Can.writeFrame(canFrame);
-    // Serial.println("CAN 0x35C: Requêtes envoyées");
 }
 
-// ——————— FONCTIONS D'AFFICHAGE DES TRAMES ———————
+// ——————— AFFICHAGE TEMPS RÉEL DES TRAMES ———————
 
 void updateCanFrameDisplay()
 {
     // Mettre à jour les textes des trames avec les valeurs RÉELLES actuelles
-    uint16_t ichg = (uint16_t)(chargeCurrentSetpoint * 10);
-    uint16_t idis = (uint16_t)(dischargeCurrentSetpoint * 10);
+    uint16_t ichg = (uint16_t)(currentChargeSetpoint * 10);
+    uint16_t idis = (uint16_t)(currentDischargeSetpoint * 10);
 
     // Trame 0x351 - Limites avec consignes dynamiques
     sprintf(lastCanFrames[0], "351: 04 02 %02X %02X %02X %02X C9 01",
@@ -347,18 +296,20 @@ void showCanFrames()
     // Indicateurs d'état en bas
     char statusLine[30];
     extern bool degradedMode;
+    extern int configuredBatteryCount;
+
     sprintf(statusLine, "%s | %dBatt | %dA/%dA",
             degradedMode ? "DEGRADE" : "NORMAL",
             configuredBatteryCount,
-            (int)chargeCurrentSetpoint,
-            (int)dischargeCurrentSetpoint);
-    drawText(2, 62, statusLine, false, false);
+            (int)currentChargeSetpoint,
+            (int)currentDischargeSetpoint);
 
     // Instructions
     drawText(100, 62, "BACK", false, false);
 
     showDisplay();
 }
+
 void setCanDisplayActive(bool active)
 {
     canDisplayActive = active;

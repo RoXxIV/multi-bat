@@ -5,9 +5,10 @@
 #include <ESP32-TWAI-CAN.hpp>
 #include "Config.h"
 #include "ModbusManager.h"
+#include "BatteryLogic.h"
 
 // ——————— CONFIGURATION MATÉRIELLE ———————
-// Pins du contrôleur CAN (à déplacer dans Config.h si validé)
+// Pins du contrôleur CAN
 #ifndef CAN_TX_PIN
 #define CAN_TX_PIN 5 // Pin de transmission CAN
 #endif
@@ -28,64 +29,89 @@
 #define CAN_ID_ALARMS 0x359          // Status Protections/Alarmes
 #define CAN_ID_REQUESTS 0x35C        // Requêtes et indicateurs système
 
-// ——————— PARAMÈTRES TEMPORELS ———————
-#define CAN_SEND_INTERVAL_MS 1000 // Intervalle d'envoi des trames CAN en millisecondes
-// Limites des consignes de courant (adaptées pour 4 batteries max)
+// ——————— PARAMÈTRES DE COMMUNICATION ———————
+#define CAN_SEND_INTERVAL_MS 1000   // Intervalle d'envoi des trames CAN en millisecondes
 #define MAX_CHARGE_CURRENT_A 600    // Courant de charge maximum (A)
 #define MAX_DISCHARGE_CURRENT_A 600 // Courant de décharge maximum (A)
-
-// ——————— ÉNUMÉRATIONS ———————
-enum CanProtocol
-{
-    PROTOCOL_PYLONTECH = 0, // Protocole Pylontech/BYD (actuel)
-    PROTOCOL_SOLIS = 1      // Protocole Solis (test) vvv
-};
 
 // ——————— VARIABLES GLOBALES ———————
 extern CanFrame canFrame;         // Structure de trame CAN pour envoi
 extern unsigned long lastCanSend; // Timestamp du dernier envoi CAN
-// Consignes dynamiques de courant (modifiables en temps réel)
-extern float chargeCurrentSetpoint;    // Consigne charge (0-600A)
-extern float dischargeCurrentSetpoint; // Consigne décharge (0-600A)
-// Variables pour affichage temps réel des trames
-extern char lastCanFrames[5][50]; // Stockage texte des trames
-extern bool canDisplayActive;     // État affichage temps réel
+extern char lastCanFrames[5][50]; // Stockage texte des trames pour affichage
+extern bool canDisplayActive;     // État affichage temps réel des trames
 
 // ——————— FONCTIONS D'INITIALISATION ———————
-bool initCanBus(); // Initialise le bus CAN avec la configuration matérielle
 
-// ——————— FONCTIONS DE CONTRÔLE DES CONSIGNES ———————
-// Définit la consigne de courant de charge (avec limitation 0-600A)
-void setChargeCurrentSetpoint(float currentA);
-// Définit la consigne de courant de décharge (avec limitation 0-600A)
-void setDischargeCurrentSetpoint(float currentA);
-float getChargeCurrentSetpoint();    // Retourne la consigne actuelle de charge
-float getDischargeCurrentSetpoint(); // Retourne la consigne actuelle de décharge
+/**
+ * @brief Initialise le bus CAN avec la configuration matérielle
+ * Configure les pins, vitesse et démarre la communication
+ * @return true si initialisation réussie, false sinon
+ */
+bool initCanBus();
 
-// ——————— FONCTIONS D'ENVOI PRINCIPAL ———————
-void sendCanData();   // Envoie toutes les trames CAN vers l'onduleur (fonction principale)
-bool shouldSendCan(); // Vérifie s'il est temps d'envoyer les trames CAN
+// ——————— ENVOI DES TRAMES CAN ———————
+/**
+ * @brief Vérifie s'il est temps d'envoyer les trames CAN
+ * Basé sur CAN_SEND_INTERVAL_MS (1 seconde)
+ * @return true si envoi nécessaire
+ */
+bool shouldSendCan();
 
-// ——————— FONCTIONS D'ENVOI SPÉCIFIQUE PAR TRAME ———————
-void sendChargeLimits();       // Envoie la trame 0x351 (limites de charge/décharge avec consignes)
-void sendSocSoh();             // Envoie la trame 0x355 (SOC et SOH globaux du système)
-void sendVoltageCurrentTemp(); // Envoie la trame 0x356 (tension, courant et température globaux)
-void sendAlarms();             // Envoie la trame 0x359 (états des protections et alarmes)
-void sendRequests();           // Envoie la trame 0x35C (requêtes système et indicateurs)
+/**
+ * @brief Fonction principale d'envoi CAN
+ * Envoie toutes les trames vers l'onduleur toutes les secondes
+ * Met à jour l'affichage si actif
+ */
+void sendCanData();
 
-// ——————— FONCTIONS D'AFFICHAGE TEMPS RÉEL ———————
-void updateCanFrameDisplay();          // Met à jour le texte d'affichage des trames avec valeurs actuelles
-void showCanFrames();                  // Affiche les trames CAN sur l'écran OLED (pour debug/monitoring)
-void setCanDisplayActive(bool active); // Active/désactive l'affichage temps réel des trames
+/**
+ * @brief Envoie la trame 0x351 - Limites de charge/décharge
+ * Contient tension max (51.6V) et consignes de courant dynamiques
+ */
+void sendChargeLimits();
 
-// ——————— ACCÈS AUX VARIABLES EXTERNES NÉCESSAIRES ———————
-// Ces déclarations permettent aux fonctions CAN d'accéder aux données système
-extern BatteryState batteryStates[];                     // États des batteries individuelles
-extern SystemDiagnostics systemDiag;                     // Diagnostic système global
-extern IndividualBatteryData individualBatteryMetrics[]; // Données détaillées batteries
-extern AggregateBatteryMetrics latestMetrics;            // Métriques consolidées
-extern bool degradedMode;                                // État mode dégradé
-extern int configuredBatteryCount;                       // Nombre de batteries configurées
-extern int respondingBatteryCount;                       // Nombre de batteries répondantes
+/**
+ * @brief Envoie la trame 0x355 - État de charge et santé
+ * Contient SOC moyen calculé et SOH fixe à 100%
+ */
+void sendSocSoh();
+
+/**
+ * @brief Envoie la trame 0x356 - Mesures principales
+ * Contient tension moyenne, courant total et température moyenne
+ */
+void sendVoltageCurrentTemp();
+
+/**
+ * @brief Envoie la trame 0x359 - Protections et alarmes
+ * Contient état des protections et alarmes calculées dynamiquement
+ */
+void sendAlarms();
+
+/**
+ * @brief Envoie la trame 0x35C - Requêtes système
+ * Indique à l'onduleur que charge et décharge sont autorisées
+ */
+void sendRequests();
+
+// ——————— AFFICHAGE TEMPS RÉEL DES TRAMES ———————
+
+/**
+ * @brief Met à jour le texte d'affichage des trames
+ * Actualise les valeurs hexadécimales selon les données actuelles
+ */
+void updateCanFrameDisplay();
+
+/**
+ * @brief Affiche l'écran des trames CAN en temps réel
+ * Montre les 5 trames + indicateurs d'état système
+ */
+void showCanFrames();
+
+/**
+ * @brief Active/désactive l'affichage temps réel des trames
+ * @param active true pour activer, false pour désactiver
+ */
+void setCanDisplayActive(bool active);
 
 #endif

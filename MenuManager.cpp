@@ -37,7 +37,6 @@ void buildMenu()
     totalMenuItems = 0;
 
     // Items de base (utilisateur standard)
-    menuItems[totalMenuItems++] = {"Afficher ID batteries", ACTION_DISPLAY_IDS, false};
     menuItems[totalMenuItems++] = {"Affichage erreurs", ACTION_ERRORS, false};
     menuItems[totalMenuItems++] = {"Afficher trames CAN", ACTION_CAN_FRAMES, false};
     menuItems[totalMenuItems++] = {"Regler luminosite", ACTION_BRIGHTNESS, false};
@@ -48,13 +47,12 @@ void buildMenu()
     {
         menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, true};
         menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, true};
-        menuItems[totalMenuItems++] = {"Parametres systeme", ACTION_SYSTEM_SETTINGS, true};
     }
 
     // Garde-fou
     if (totalMenuItems == 0)
     {
-        menuItems[0] = {"Aucun item", ACTION_DISPLAY_IDS, false};
+        menuItems[0] = {"Aucun item", ACTION_ERRORS, false};
         totalMenuItems = 1;
     }
 
@@ -487,9 +485,6 @@ void executeMenuAction(int idx)
         currentScreen = SCREEN_CODE_INPUT;
         resetCodeInput();
         break;
-    case ACTION_DISPLAY_IDS:
-        actionDisplayIds();
-        break;
     case ACTION_PAIRING:
         actionPairing();
         break;
@@ -499,9 +494,6 @@ void executeMenuAction(int idx)
     case ACTION_INDIVIDUAL:
         selectedBatteryIndex = 0;
         currentScreen = SCREEN_BATTERY_LIST;
-        break;
-    case ACTION_SYSTEM_SETTINGS:
-        actionSystemSettings();
         break;
     case ACTION_BRIGHTNESS:
         currentScreen = SCREEN_BRIGHTNESS;
@@ -561,25 +553,10 @@ void checkAdminCode()
 }
 
 // ——————— ACTIONS MENU (STUBS) ———————
-void actionDisplayIds()
-{
-    Serial.println("Action: Afficher ID batteries");
-}
-
 void actionShowErrors()
 {
     currentScreen = SCREEN_ERROR_LIST;
     Serial.println("Action: Affichage erreurs");
-}
-
-void actionIndividualBatteries()
-{
-    Serial.println("Action: Batteries individuelles");
-}
-
-void actionSystemSettings()
-{
-    Serial.println("Action: Parametres systeme (ADMIN)");
 }
 
 void actionShowCanFrames()

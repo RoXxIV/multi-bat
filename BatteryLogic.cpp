@@ -1,5 +1,4 @@
 #include "BatteryLogic.h"
-#include "CanBusManager.h"
 
 BatteryState batteryStates[MAX_BATTERIES];
 SystemDiagnostics systemDiag;
@@ -10,6 +9,9 @@ int respondingBatteryCount = 0;
 bool degradedMode = false;
 bool systemInitialized = false;
 extern int configuredBatteryCount;
+// Variables globales pour les erreurs
+SystemError systemErrors[MAX_SYSTEM_ERRORS];
+int errorCount = 0;
 
 // ——————— INITIALISATION ET SYSTÈME ———————
 
@@ -617,12 +619,14 @@ bool checkDegradedModeConditions()
 
 bool checkCanExitDegradedMode()
 {
-    // Conditions pour sortir du mode dégradé :
-    // 1. Toutes les batteries configurées répondent
-    // 2. Pas de surtempérature
-    // 3. Pas de déséquilibrage critique
-    // 4. Delta température acceptable
-
+    /*
+    Pour sortir du mode dégradé, toutes les conditions de sécurité
+    doivent être revenues à la normale pour garantir un fonctionnement optimal.
+    1. Toutes les batteries configurées répondent
+    2. Pas de surtempérature
+    3. Pas de déséquilibrage critique
+    4. Delta température acceptable
+    */
     bool allBatteriesRespond = (respondingBatteryCount == configuredBatteryCount);
     bool tempOk = (systemDiag.maxBatteryTemp <= MAX_DISCHARGE_TEMP);
     bool tempDeltaOk = (systemDiag.maxBatteryTemp - systemDiag.minBatteryTemp <= TEMP_DIFF_THRESHOLD);
@@ -1022,12 +1026,12 @@ float calculateChargeSetpoint()
     }
     else if (degradedMode) // Si le mode dégradé est vrai
     {
-        setpoint = 10.0f;
+        setpoint = DEGRADED_MODE_CURRENT; // 10.0f;
         snprintf(reason, sizeof(reason), "Mode dégradé actif");
     }
     else if (hasCellAbove3450) // Dès qu'une cellule > 3450mV
     {
-        setpoint = 10.0f * activeBatteryCount;
+        setpoint = LIMITED_CURRENT_PER_BATTERY * activeBatteryCount; // 10.0f;
         snprintf(reason, sizeof(reason),
                  "Cellule > 3.450V - LIMITATION (max: %.3fV, %d batt actives)",
                  maxCellVoltage, activeBatteryCount);
@@ -1055,7 +1059,7 @@ float calculateChargeSetpoint()
     }
     else // Conditions normales
     {
-        setpoint = 150.0f * activeBatteryCount;
+        setpoint = NORMAL_CURRENT_PER_BATTERY * activeBatteryCount;
         snprintf(reason, sizeof(reason),
                  "Conditions normales (%d batt actives)",
                  activeBatteryCount);
@@ -1259,54 +1263,12 @@ void calculateAverages()
         Serial.printf("  Courant total: %.1fA\n", latestMetrics.totalCurrent);
         Serial.printf("  Température moyenne: %.1f°C\n", latestMetrics.averageTemp);
         Serial.printf("  Température MOS moyenne: %.1f°C\n", avgMosTemp);
-
-        // Mettre à jour les données pour les trames CAN
-        updateCanDataWithAverages(latestMetrics, avgMosTemp);
     }
     else
     {
         latestMetrics.isDataValid = false;
         Serial.println("ERREUR: Aucune batterie valide pour le calcul des moyennes");
     }
-
-    Serial.println("================================");
-}
-
-void updateCanDataWithAverages(const AggregateBatteryMetrics &metrics, float avgMosTemp)
-{
-    // Cette fonction prépare les données réelles pour les trames CAN
-    // Les trames seront mises à jour automatiquement lors du prochain envoi
-
-    Serial.println("=== PRÉPARATION DONNÉES CAN ===");
-
-    // Calcul du SOC global (moyenne pondérée pourrait être ajoutée plus tard)
-    int globalSoc = (int)round(metrics.averageSoc);
-
-    // Calcul de la tension globale du système
-    float systemVoltage = metrics.averageVoltage;
-
-    // Courant total du système
-    float systemCurrent = metrics.totalCurrent;
-
-    // Température représentative du système
-    float systemTemp = metrics.averageTemp;
-
-    // Calcul des alarmes dynamiques
-    uint8_t systemAlarms = calculateSystemAlarms();
-
-    // Calcul des protections actives
-    uint8_t systemProtections = calculateSystemProtections();
-
-    Serial.printf("DONNÉES CAN PRÉPARÉES:\n");
-    Serial.printf("  SOC système: %d%%\n", globalSoc);
-    Serial.printf("  Tension système: %.2fV\n", systemVoltage);
-    Serial.printf("  Courant système: %.1fA\n", systemCurrent);
-    Serial.printf("  Température système: %.1f°C\n", systemTemp);
-    Serial.printf("  Alarmes: 0x%02X\n", systemAlarms);
-    Serial.printf("  Protections: 0x%02X\n", systemProtections);
-
-    // Ces valeurs seront utilisées par les fonctions CAN existantes
-    // lors du prochain appel à sendCanData()
 
     Serial.println("================================");
 }
@@ -1421,24 +1383,6 @@ int findHighestVoltageBattery()
     return highestIndex;
 }
 
-bool isCellVoltageValid(float cellVoltage)
-{
-    return (cellVoltage >= MIN_DISCHARGE_CELL_VOLTAGE &&
-            cellVoltage <= MAX_CHARGE_CELL_VOLTAGE);
-}
-
-bool isTemperatureValid(float temperature, bool isCharging)
-{
-    if (isCharging)
-    {
-        return (temperature >= MIN_CHARGE_TEMP && temperature <= MAX_CHARGE_TEMP);
-    }
-    else
-    {
-        return (temperature >= MIN_DISCHARGE_TEMP && temperature <= MAX_DISCHARGE_TEMP);
-    }
-}
-
 // ——————— GESTION DES LEDS D'ÉTAT ———————
 
 void initStatusLeds()
@@ -1481,10 +1425,6 @@ void updateStatusLeds()
 }
 
 // ——————— GESTION DES ERREURS SYSTÈME ———————
-// Variables globales pour les erreurs
-SystemError systemErrors[MAX_SYSTEM_ERRORS];
-int errorCount = 0;
-
 void initErrorSystem()
 {
     for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)

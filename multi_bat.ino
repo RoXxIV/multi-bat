@@ -133,15 +133,7 @@ void loop()
     updateSystemMetrics();         // Mise à jour des métriques système
     runBatteryManagementCycle();   // Gestion intelligente des batteries
 
-    // Calcul des consignes
-    currentChargeSetpoint = calculateChargeSetpoint();
-    currentDischargeSetpoint = calculateDischargeSetpoint();
-
-    printSystemStatus(); // Affichage de l'état système
-
-    // Mise à jour des consignes CAN avec les valeurs calculées
-    setChargeCurrentSetpoint(currentChargeSetpoint);
-    setDischargeCurrentSetpoint(currentDischargeSetpoint);
+    printSystemStatus(); // Affiche l'état du système avec les consignes déjà calculées.
   }
   sendCanData();
 }

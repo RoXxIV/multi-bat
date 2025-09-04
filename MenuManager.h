@@ -17,7 +17,6 @@ enum PairingChoice
 // Paramètres de l'affichage
 extern int brightnessLevel;              // Niveau de luminosité (1 à 5)
 extern const uint8_t brightnessValues[]; // Tableau de valeurs de luminosité
-extern uint8_t currentBrightness;        // Stocke la valeur de luminosité actuelle
 // État du menu et navigation
 extern int currentScreen;        // État actuel de l'interface (écran principal, menu, saisie code, etc.)
 extern int selectedMenuItem;     // Index de l'item de menu actuellement sélectionné
@@ -67,11 +66,8 @@ void resetCodeInput(); // Remet à zéro la saisie du code admin
 void checkAdminCode(); // Vérifie si le code saisi est correct et gère l'activation du mode admin
 
 // ——————— ACTIONS DES MENUS ———————
-void actionDisplayIds();          // Envoie H=7 à toutes les batteries pour affichage ID
-void actionShowErrors();          // Affiche les erreurs système (à implémenter)
-void actionIndividualBatteries(); // Affiche les données individuelles par batterie (à implémenter)
-void actionSystemSettings();      // Configuration système avancée (mode admin uniquement)
-void actionShowCanFrames();       // Active l'affichage temps réel des trames CAN
+void actionShowErrors();    // Affiche les erreurs système (à implémenter)     // Configuration système avancée (mode admin uniquement)
+void actionShowCanFrames(); // Active l'affichage temps réel des trames CAN
 
 // ——————— APPAIRAGE DES BATTERIES ———————
 void actionPairing();                              // Lance le processus complet d'appairage des batteries

@@ -3,6 +3,7 @@
 // ——————— VARIABLES GLOBALES & SETUP ———————
 ButtonState buttons[BTN_COUNT];
 unsigned long debounceDelay = 50;
+static void updateSingleButton(int buttonIndex);
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initButtons(int upPin, int downPin, int okPin, int backPin)
@@ -47,7 +48,7 @@ void updateButtons()
     }
 }
 
-void updateSingleButton(int buttonIndex)
+static void updateSingleButton(int buttonIndex)
 {
     if (buttonIndex < 0 || buttonIndex >= BTN_COUNT)
         return;

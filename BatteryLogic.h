@@ -12,7 +12,6 @@ extern float currentDischargeSetpoint;
 extern int activeBatteryCount;
 extern int respondingBatteryCount;
 extern bool degradedMode;
-extern bool systemInitialized;
 
 // ——————— INITIALISATION ET SYSTÈME ———————
 /**
@@ -22,8 +21,9 @@ extern bool systemInitialized;
 void initBatteryManagement();
 
 /**
- * @brief Fonction principale de gestion des batteries
- * Orchestre toute la logique intelligente
+ * @brief Fonction principale de la logique de gestion.
+ * Orchestre l'analyse, la gestion des limitations, l'activation des batteries
+ * et le calcul des consignes.
  */
 void runBatteryManagementCycle();
 
@@ -140,13 +140,6 @@ float calculateDischargeSetpoint();
 void calculateAverages();
 
 /**
- * @brief Met à jour les données CAN avec les valeurs moyennes calculées
- * @param metrics Structure des métriques agrégées
- * @param avgMosTemp Température moyenne des MOSFETs
- */
-void updateCanDataWithAverages(const AggregateBatteryMetrics &metrics, float avgMosTemp);
-
-/**
  * @brief Calcule les alarmes système pour les trames CAN
  * @return Byte d'alarmes selon l'état du système
  */
@@ -164,21 +157,6 @@ uint8_t calculateSystemProtections();
  * @return Index de la batterie (-1 si aucune trouvée)
  */
 int findHighestVoltageBattery();
-
-/**
- * @brief Vérifie si une tension de cellule est dans les limites acceptables
- * @param cellVoltage Tension de la cellule en volts
- * @return true si la tension est acceptable
- */
-bool isCellVoltageValid(float cellVoltage);
-
-/**
- * @brief Vérifie si une température est dans les limites acceptables
- * @param temperature Température en °C
- * @param isCharging true si la batterie est en charge
- * @return true si la température est acceptable
- */
-bool isTemperatureValid(float temperature, bool isCharging);
 
 // ——————— GESTION DES LEDS D'ÉTAT ———————
 /**
@@ -217,8 +195,4 @@ void removeSystemError(ErrorType type, int batteryId);
  */
 int getActiveErrorCount();
 
-/**
- * @brief Affiche l'écran des erreurs système
- */
-void showErrorScreen();
 #endif

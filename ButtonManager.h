@@ -15,8 +15,7 @@ void initButtons(int upPin, int downPin, int okPin, int backPin);
 void setDebounceDelay(unsigned long delay);
 
 // ——————— FONCTIONS DE MISE À JOUR ———————
-void updateButtons();                     // Met à jour l'état de tous les boutons (à appeler dans loop() principal)
-void updateSingleButton(int buttonIndex); // Met à jour l'état d'un bouton spécifique (usage interne)
+void updateButtons(); // Met à jour l'état de tous les boutons (à appeler dans loop() principal)
 
 // ——————— FONCTIONS DE DÉTECTION D'APPUI ———————
 bool isButtonPressed(int buttonIndex); // Retourne vrai si le bouton est appuyé
