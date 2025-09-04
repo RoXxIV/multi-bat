@@ -87,4 +87,8 @@ void waitForUserConfirmation(const char *title, const char *line1, const char *l
 void adjustMenuView();                 // Ajuste la fenêtre de visualisation du menu (scroll automatique)
 void executeMenuAction(int itemIndex); // Exécute l'action associée à un item de menu
 
+/**
+ * @brief Affiche l'écran des erreurs système
+ */
+void showErrorScreen();
 #endif

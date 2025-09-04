@@ -87,14 +87,15 @@ enum ButtonType
 // Types d'écrans de l'interface
 enum ScreenType
 {
-    SCREEN_MAIN_DATA = 0,     // Écran principal avec données batteries
-    SCREEN_MENU = 1,          // Écran de menu principal
-    SCREEN_CODE_INPUT = 2,    // Écran de saisie code admin
-    SCREEN_CODE_RESULT = 3,   // Écran de résultat validation code
-    SCREEN_CAN_FRAMES = 4,    // Écran d'affichage trames CAN
-    SCREEN_BRIGHTNESS = 5,    // Écran de réglage de luminosité
-    SCREEN_BATTERY_LIST = 6,  // Nouvel écran: liste des batteries
-    SCREEN_BATTERY_DETAIL = 7 // Nouvel écran: détails d'une batterie
+    SCREEN_MAIN_DATA = 0,      // Écran principal avec données batteries
+    SCREEN_MENU = 1,           // Écran de menu principal
+    SCREEN_CODE_INPUT = 2,     // Écran de saisie code admin
+    SCREEN_CODE_RESULT = 3,    // Écran de résultat validation code
+    SCREEN_CAN_FRAMES = 4,     // Écran d'affichage trames CAN
+    SCREEN_BRIGHTNESS = 5,     // Écran de réglage de luminosité
+    SCREEN_BATTERY_LIST = 6,   // Nouvel écran: liste des batteries
+    SCREEN_BATTERY_DETAIL = 7, // Nouvel écran: détails d'une batterie
+    SCREEN_ERROR_LIST = 8      // Écran des erreurs système
 };
 // Actions disponibles dans les menus
 enum MenuActions
@@ -170,5 +171,35 @@ struct SystemDiagnostics
     float minBatteryTemp;         // Température min parmi toutes les batteries
     unsigned long lastDiagnostic; // Timestamp dernier diagnostic
 };
+
+// ——————— STRUCTURES POUR LA GESTION DES ERREURS ———————
+
+// Types d'erreurs système
+enum ErrorType
+{
+    ERROR_BATTERY_DISCONNECTED = 1,
+    ERROR_MOSFET_CHARGE = 2,
+    ERROR_MOSFET_DISCHARGE = 3,
+    ERROR_CELL_IMBALANCE = 4,
+    ERROR_OVERTEMPERATURE = 5,
+    ERROR_UNDERTEMPERATURE = 6,
+    ERROR_OVERVOLTAGE = 7,
+    ERROR_UNDERVOLTAGE = 8,
+    ERROR_CAN_BUS = 9
+};
+
+// Structure d'une erreur
+struct SystemError
+{
+    bool active;                 // Erreur active ou non
+    ErrorType type;              // Type d'erreur
+    int batteryId;               // ID batterie concernée (-1 si système global)
+    unsigned long firstOccurred; // Timestamp première occurrence
+    unsigned long lastOccurred;  // Timestamp dernière occurrence
+    int occurrenceCount;         // Nombre d'occurrences
+    char description[50];        // Description courte
+};
+
+#define MAX_SYSTEM_ERRORS 20 // Nombre maximum d'erreurs stockées
 
 #endif

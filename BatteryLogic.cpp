@@ -51,6 +51,8 @@ void initBatteryManagement()
     degradedMode = false;
     systemInitialized = false;
 
+    initErrorSystem();
+
     Serial.println("✓ Structures de gestion batteries initialisées");
 }
 
@@ -277,6 +279,7 @@ int checkBatteryConnections()
             {
                 Serial.printf("✅ BATTERIE ID=%d RECONNECTÉE\n", batteryId);
                 state->status = BATTERY_OK;
+                removeSystemError(ERROR_BATTERY_DISCONNECTED, batteryId);
             }
 
             state->isResponding = true;
@@ -298,6 +301,7 @@ int checkBatteryConnections()
                     state->status = BATTERY_NOT_RESPONDING;
                     state->isActive = false; // Désactiver la batterie
                     batteryLost = true;
+                    addSystemError(ERROR_BATTERY_DISCONNECTED, batteryId, "Batterie non detectee");
                 }
             }
             else
@@ -401,14 +405,18 @@ bool checkMosfetStatus()
             if (!chargeMosfetOk && !dischargeMosfetOk)
             {
                 Serial.println("CHARGE+DÉCHARGE OFF");
+                addSystemError(ERROR_MOSFET_CHARGE, batteryId, "MOSFET charge OFF");
+                addSystemError(ERROR_MOSFET_DISCHARGE, batteryId, "MOSFET decharge OFF");
             }
             else if (!chargeMosfetOk)
             {
                 Serial.println("CHARGE OFF");
+                addSystemError(ERROR_MOSFET_CHARGE, batteryId, "MOSFET charge OFF");
             }
             else
             {
                 Serial.println("DÉCHARGE OFF");
+                addSystemError(ERROR_MOSFET_DISCHARGE, batteryId, "MOSFET decharge OFF");
             }
 
             // Marquer comme ayant un problème MOSFET
@@ -442,11 +450,15 @@ bool checkMosfetStatus()
                         state->status = BATTERY_OK;
                         state->activeLimitation = NO_LIMITATION;
                         state->lastMosfetCheck = 0;
+                        removeSystemError(ERROR_MOSFET_CHARGE, batteryId);
+                        removeSystemError(ERROR_MOSFET_DISCHARGE, batteryId);
                     }
                     else
                     {
                         Serial.printf("⏳ BATTERIE ID=%d: En attente d'équilibrage (delta=%.3fV)\n",
                                       batteryId, state->voltageDelta);
+                        removeSystemError(ERROR_MOSFET_CHARGE, batteryId);
+                        removeSystemError(ERROR_MOSFET_DISCHARGE, batteryId);
                     }
                 }
             }
@@ -501,7 +513,12 @@ bool checkDegradedModeConditions()
                  TEMP_DIFF_THRESHOLD);
 
         Serial.printf("🚨 %s\n", degradedReason);
+        addSystemError(ERROR_OVERTEMPERATURE, -1, "Delta temperature > 10C");
         shouldActivateDegraded = true;
+    }
+    else
+    {
+        removeSystemError(ERROR_OVERTEMPERATURE, -1);
     }
 
     // ——————— CONDITION 2: Différence tension cellules > 250mV ———————
@@ -523,8 +540,13 @@ bool checkDegradedModeConditions()
             Serial.printf("🚨 %s\n", degradedReason);
 
             // Marquer la batterie avec un problème de déséquilibre
+            addSystemError(ERROR_CELL_IMBALANCE, batteryId, "Desequilibrage cellules");
             state->status = BATTERY_CELL_IMBALANCE;
             shouldActivateDegraded = true;
+        }
+        else
+        {
+            removeSystemError(ERROR_CELL_IMBALANCE, batteryId);
         }
     }
 
@@ -567,6 +589,7 @@ bool checkDegradedModeConditions()
                  systemDiag.maxBatteryTemp, MAX_DISCHARGE_TEMP);
 
         Serial.printf("🚨 %s\n", degradedReason);
+        addSystemError(ERROR_OVERTEMPERATURE, -1, "Surtemperature systeme");
         shouldActivateDegraded = true;
     }
 
@@ -1455,4 +1478,84 @@ void updateStatusLeds()
 
     // Contrôler la LED rouge
     digitalWrite(LED_RED_PIN, shouldShowAlarm ? HIGH : LOW);
+}
+
+// ——————— GESTION DES ERREURS SYSTÈME ———————
+// Variables globales pour les erreurs
+SystemError systemErrors[MAX_SYSTEM_ERRORS];
+int errorCount = 0;
+
+void initErrorSystem()
+{
+    for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)
+    {
+        systemErrors[i].active = false;
+        systemErrors[i].type = ERROR_BATTERY_DISCONNECTED;
+        systemErrors[i].batteryId = -1;
+        systemErrors[i].firstOccurred = 0;
+        systemErrors[i].lastOccurred = 0;
+        systemErrors[i].occurrenceCount = 0;
+        memset(systemErrors[i].description, 0, sizeof(systemErrors[i].description));
+    }
+    errorCount = 0;
+    Serial.println("✓ Système de gestion des erreurs initialisé");
+}
+
+void addSystemError(ErrorType type, int batteryId, const char *description)
+{
+    unsigned long now = millis();
+
+    // Chercher si l'erreur existe déjà
+    for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)
+    {
+        if (systemErrors[i].active &&
+            systemErrors[i].type == type &&
+            systemErrors[i].batteryId == batteryId)
+        {
+            // Erreur existante - mettre à jour
+            systemErrors[i].lastOccurred = now;
+            systemErrors[i].occurrenceCount++;
+            return;
+        }
+    }
+
+    // Nouvelle erreur - trouver une place libre
+    for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)
+    {
+        if (!systemErrors[i].active)
+        {
+            systemErrors[i].active = true;
+            systemErrors[i].type = type;
+            systemErrors[i].batteryId = batteryId;
+            systemErrors[i].firstOccurred = now;
+            systemErrors[i].lastOccurred = now;
+            systemErrors[i].occurrenceCount = 1;
+            strncpy(systemErrors[i].description, description, sizeof(systemErrors[i].description) - 1);
+            errorCount++;
+
+            Serial.printf("NOUVELLE ERREUR: %s (Batt ID=%d)\n", description, batteryId);
+            break;
+        }
+    }
+}
+
+void removeSystemError(ErrorType type, int batteryId)
+{
+    for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)
+    {
+        if (systemErrors[i].active &&
+            systemErrors[i].type == type &&
+            systemErrors[i].batteryId == batteryId)
+        {
+            systemErrors[i].active = false;
+            errorCount--;
+            Serial.printf("ERREUR RÉSOLUE: %s (Batt ID=%d)\n", systemErrors[i].description, batteryId);
+            break;
+        }
+    }
+}
+
+int getActiveErrorCount()
+{
+    return errorCount;
 }

@@ -190,4 +190,35 @@ void initStatusLeds();
  * @brief Met à jour l'état des LEDs selon les conditions système
  */
 void updateStatusLeds();
+
+// ——————— GESTION DES ERREURS SYSTÈME ———————
+/**
+ * @brief Initialise le système de gestion des erreurs
+ */
+void initErrorSystem();
+
+/**
+ * @brief Ajoute ou met à jour une erreur système
+ * @param type Type d'erreur
+ * @param batteryId ID de la batterie (-1 si erreur globale)
+ * @param description Description de l'erreur
+ */
+void addSystemError(ErrorType type, int batteryId, const char *description);
+
+/**
+ * @brief Supprime une erreur spécifique
+ * @param type Type d'erreur
+ * @param batteryId ID de la batterie
+ */
+void removeSystemError(ErrorType type, int batteryId);
+
+/**
+ * @brief Retourne le nombre d'erreurs actives
+ */
+int getActiveErrorCount();
+
+/**
+ * @brief Affiche l'écran des erreurs système
+ */
+void showErrorScreen();
 #endif

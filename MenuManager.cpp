@@ -234,6 +234,10 @@ void goBackMenu()
     case SCREEN_BATTERY_DETAIL:
         currentScreen = SCREEN_BATTERY_LIST; // Retour des détails vers la liste
         break;
+    case SCREEN_ERROR_LIST:
+        currentScreen = SCREEN_MENU;
+        Serial.println("Retour du menu erreurs vers menu principal");
+        break;
     }
 }
 
@@ -265,6 +269,9 @@ void updateMenuDisplay()
         break;
     case SCREEN_BATTERY_DETAIL:
         showBatteryDetailScreen();
+        break;
+    case SCREEN_ERROR_LIST:
+        showErrorScreen();
         break;
     }
 }
@@ -556,6 +563,7 @@ void actionDisplayIds()
 
 void actionShowErrors()
 {
+    currentScreen = SCREEN_ERROR_LIST;
     Serial.println("Action: Affichage erreurs");
 }
 
@@ -885,5 +893,57 @@ void showBrightnessScreen()
     // Instructions
     // drawText(0, 60, "R:annuler   OK:valider");
 
+    showDisplay();
+}
+
+void showErrorScreen()
+{
+    extern SystemError systemErrors[MAX_SYSTEM_ERRORS];
+    extern int errorCount;
+
+    clearDisplay();
+    drawTitle("ERREURS SYSTÈME");
+
+    if (errorCount == 0)
+    {
+        drawText(5, 30, "Aucune erreur active", false, false);
+        drawText(5, 45, "Système OK", false, false);
+    }
+    else
+    {
+        char countStr[30];
+        sprintf(countStr, "%d erreur(s) active(s)", errorCount);
+        drawText(5, 20, countStr, false, false);
+
+        // Afficher les 3 premières erreurs
+        int displayCount = 0;
+        for (int i = 0; i < MAX_SYSTEM_ERRORS && displayCount < 3; i++)
+        {
+            if (systemErrors[i].active)
+            {
+                char errorLine[40];
+                if (systemErrors[i].batteryId >= 0)
+                {
+                    sprintf(errorLine, "ID%d: %s", systemErrors[i].batteryId, systemErrors[i].description);
+                }
+                else
+                {
+                    sprintf(errorLine, "SYS: %s", systemErrors[i].description);
+                }
+
+                drawText(5, 30 + displayCount * 10, errorLine, false, false);
+                displayCount++;
+            }
+        }
+
+        if (errorCount > 3)
+        {
+            char moreStr[20];
+            sprintf(moreStr, "... +%d autres", errorCount - 3);
+            drawText(5, 55, moreStr, false, false);
+        }
+    }
+
+    drawText(5, 64, "BACK: retour", false, false);
     showDisplay();
 }
