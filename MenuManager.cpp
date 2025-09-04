@@ -364,8 +364,10 @@ void showCodeResultScreen()
 
 void showCanFramesScreen()
 {
-    // Utiliser la fonction du CanBusManager
-    extern void showCanFrames();
+    // Actualiser les trames en temps réel
+    updateCanFrameDisplay();
+
+    // Afficher l'écran
     showCanFrames();
 }
 
@@ -504,6 +506,9 @@ void executeMenuAction(int idx)
     case ACTION_BRIGHTNESS:
         currentScreen = SCREEN_BRIGHTNESS;
         break;
+    case ACTION_CAN_FRAMES:
+        actionShowCanFrames();
+        break;
     }
 }
 
@@ -579,11 +584,9 @@ void actionSystemSettings()
 
 void actionShowCanFrames()
 {
-    Serial.println("Action: Affichage trames CAN");
-    extern void setCanDisplayActive(bool active);
+    Serial.println("Action: Affichage trames CAN temps réel");
     setCanDisplayActive(true);
     currentScreen = SCREEN_CAN_FRAMES;
-    Serial.printf("DEBUG: currentScreen = %d\n", currentScreen);
 }
 
 // ——————— APPAIRAGE DES BATTERIES ———————

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ESP32-TWAI-CAN.hpp>
 #include "Config.h"
+#include "ModbusManager.h"
 
 // ——————— CONFIGURATION MATÉRIELLE ———————
 // Pins du contrôleur CAN (à déplacer dans Config.h si validé)
@@ -76,5 +77,15 @@ void sendRequests();           // Envoie la trame 0x35C (requêtes système et i
 void updateCanFrameDisplay();          // Met à jour le texte d'affichage des trames avec valeurs actuelles
 void showCanFrames();                  // Affiche les trames CAN sur l'écran OLED (pour debug/monitoring)
 void setCanDisplayActive(bool active); // Active/désactive l'affichage temps réel des trames
+
+// ——————— ACCÈS AUX VARIABLES EXTERNES NÉCESSAIRES ———————
+// Ces déclarations permettent aux fonctions CAN d'accéder aux données système
+extern BatteryState batteryStates[];                     // États des batteries individuelles
+extern SystemDiagnostics systemDiag;                     // Diagnostic système global
+extern IndividualBatteryData individualBatteryMetrics[]; // Données détaillées batteries
+extern AggregateBatteryMetrics latestMetrics;            // Métriques consolidées
+extern bool degradedMode;                                // État mode dégradé
+extern int configuredBatteryCount;                       // Nombre de batteries configurées
+extern int respondingBatteryCount;                       // Nombre de batteries répondantes
 
 #endif

@@ -1,4 +1,6 @@
 #include "CanBusManager.h"
+#include "ModbusManager.h"
+#include "BatteryLogic.h"
 
 // ——————— VARIABLES GLOBALES ———————
 CanFrame canFrame;
@@ -145,8 +147,24 @@ void sendSocSoh()
     canFrame.extd = 0;
     canFrame.data_length_code = 8;
 
-    // SOC: 20% = 20 = 0x0014, SOH: 100% = 100 = 0x0064
-    uint16_t soc = 20;  // 20%
+    // SOC DYNAMIQUE: Utiliser la moyenne calculée des batteries
+    extern AggregateBatteryMetrics latestMetrics;
+    uint16_t soc = 0;
+
+    if (latestMetrics.isDataValid)
+    {
+        // Conversion du SOC moyen vers entier avec arrondi
+        soc = (uint16_t)round(latestMetrics.averageSoc);
+
+        // Sécurité: limiter entre 0 et 100%
+        if (soc > 100)
+            soc = 100;
+    }
+    else
+    {
+        // Valeur par défaut si pas de données valides
+        soc = 0;
+    }
     uint16_t soh = 100; // 100%
 
     // Format little-endian selon la doc
@@ -160,7 +178,7 @@ void sendSocSoh()
     canFrame.data[7] = 0x00;          // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    // Serial.printf("CAN 0x355: SOC=%d%%, SOH=%d%%\n", soc, soh);
+    Serial.printf("CAN 0x355: SOC=%d%%, SOH=%d%%\n", soc, soh);
 }
 
 void sendVoltageCurrentTemp()
@@ -179,6 +197,26 @@ void sendVoltageCurrentTemp()
     uint16_t current = 0;    // 0.0A
     uint16_t temp = 270;     // 27.0°C en 0.1°C
 
+    if (latestMetrics.isDataValid)
+    {
+        // Tension: Conversion V vers 0.01V (ex: 48.5V → 4850)
+        voltage = (uint16_t)(latestMetrics.averageVoltage * 100);
+
+        // Courant: Conversion A vers 0.01A avec offset 30000
+        // Positif = charge, Négatif = décharge
+        int16_t currentRaw = (int16_t)(latestMetrics.totalCurrent * 100);
+        current = (uint16_t)(currentRaw + 30000);
+
+        // Température: Conversion °C vers 0.1°C (ex: 35.2°C → 352)
+        temp = (uint16_t)(latestMetrics.averageTemp * 10);
+
+        // Sécurités pour éviter les valeurs aberrantes
+        if (voltage > 6000)
+            voltage = 6000; // Max 60V
+        if (temp > 1000)
+            temp = 1000; // Max 100°C
+    }
+
     // Format little-endian selon la doc
     canFrame.data[0] = lowByte(voltage);  // 0x68
     canFrame.data[1] = highByte(voltage); // 0x10
@@ -190,30 +228,39 @@ void sendVoltageCurrentTemp()
     canFrame.data[7] = 0x00;              // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    /*Serial.printf("CAN 0x356: V=%.2fV, I=%.1fA, T=%.1f°C\n",
-                  voltage / 100.0, current / 100.0, temp / 10.0);*/
+    Serial.printf("CAN 0x356: V=%.2fV, I=%.1fA, T=%.1f°C (données %s)\n",
+                  voltage / 100.0, (current - 30000) / 100.0, temp / 10.0,
+                  latestMetrics.isDataValid ? "valides" : "défaut");
 }
 
 void sendAlarms()
 {
-    // Données Brutes : 00 00 04 00 01 00 00 00
-
     canFrame = {0};
     canFrame.identifier = CAN_ID_ALARMS;
     canFrame.extd = 0;
     canFrame.data_length_code = 8;
 
-    canFrame.data[0] = 0x00; // Protections: aucune active
-    canFrame.data[1] = 0x00; // Réservé
-    canFrame.data[2] = 0x04; // Alarmes: bit 2 actif
-    canFrame.data[3] = 0x00; // Réservé
-    canFrame.data[4] = 0x01; // Nombre de modules: 1
-    canFrame.data[5] = 0x00; // Signature
-    canFrame.data[6] = 0x00; // Signature
-    canFrame.data[7] = 0x00; // Réservé
+    // ⭐ UTILISER LES FONCTIONS EXISTANTES DE BatteryLogic.cpp
+    uint8_t protections = calculateSystemProtections();
+    uint8_t alarms = calculateSystemAlarms();
+
+    // Nombre de modules réel
+    extern int configuredBatteryCount;
+    uint8_t moduleCount = (configuredBatteryCount > 0) ? configuredBatteryCount : 1;
+
+    canFrame.data[0] = protections; // Protections calculées
+    canFrame.data[1] = 0x00;        // Réservé
+    canFrame.data[2] = alarms;      // Alarmes calculées
+    canFrame.data[3] = 0x00;        // Réservé
+    canFrame.data[4] = moduleCount; // Nombre réel de batteries
+    canFrame.data[5] = 0x00;        // Signature
+    canFrame.data[6] = 0x00;        // Signature
+    canFrame.data[7] = 0x00;        // Réservé
 
     ESP32Can.writeFrame(canFrame);
-    // Serial.println("CAN 0x359: Alarmes envoyées");
+
+    Serial.printf("CAN 0x359: Protections=0x%02X, Alarmes=0x%02X, Modules=%d\n",
+                  protections, alarms, moduleCount);
 }
 
 void sendRequests()
@@ -243,16 +290,41 @@ void sendRequests()
 
 void updateCanFrameDisplay()
 {
-    // Mettre à jour les textes des trames avec les valeurs actuelles
+    // Mettre à jour les textes des trames avec les valeurs RÉELLES actuelles
     uint16_t ichg = (uint16_t)(chargeCurrentSetpoint * 10);
     uint16_t idis = (uint16_t)(dischargeCurrentSetpoint * 10);
 
-    /*sprintf(lastCanFrames[0], "351: 04 02 %02X %02X %02X %02X C9 01",
-            lowByte(ichg), highByte(ichg), lowByte(idis), highByte(idis));*/
+    // Trame 0x351 - Limites avec consignes dynamiques
+    sprintf(lastCanFrames[0], "351: 04 02 %02X %02X %02X %02X C9 01",
+            lowByte(ichg), highByte(ichg), lowByte(idis), highByte(idis));
 
-    strcpy(lastCanFrames[1], "355: 14 00 64 00 D0 07 00 00");
-    strcpy(lastCanFrames[2], "356: 68 10 00 00 0E 01 00 00");
-    strcpy(lastCanFrames[3], "359: 00 00 04 00 01 00 00 00");
+    // Trame 0x355 - SOC/SOH avec données réelles
+    extern AggregateBatteryMetrics latestMetrics;
+    uint16_t soc_display = latestMetrics.isDataValid ? (uint16_t)round(latestMetrics.averageSoc) : 0;
+    uint16_t soh_display = 100; // Fixe comme convenu
+    sprintf(lastCanFrames[1], "355: %02X %02X %02X %02X D0 07 00 00",
+            lowByte(soc_display), highByte(soc_display),
+            lowByte(soh_display), highByte(soh_display));
+
+    // Trame 0x356 - Tension/Courant/Température avec données réelles
+    uint16_t volt_display = latestMetrics.isDataValid ? (uint16_t)(latestMetrics.averageVoltage * 100) : 4200;
+    int16_t curr_raw = latestMetrics.isDataValid ? (int16_t)(latestMetrics.totalCurrent * 100) : 0;
+    uint16_t curr_display = (uint16_t)(curr_raw + 30000);
+    uint16_t temp_display = latestMetrics.isDataValid ? (uint16_t)(latestMetrics.averageTemp * 10) : 270;
+    sprintf(lastCanFrames[2], "356: %02X %02X %02X %02X %02X %02X 00 00",
+            lowByte(volt_display), highByte(volt_display),
+            lowByte(curr_display), highByte(curr_display),
+            lowByte(temp_display), highByte(temp_display));
+
+    // Trame 0x359 - Protections/Alarmes avec calcul dynamique
+    uint8_t protections = calculateSystemProtections();
+    uint8_t alarms = calculateSystemAlarms();
+    extern int configuredBatteryCount;
+    uint8_t modules = (configuredBatteryCount > 0) ? configuredBatteryCount : 1;
+    sprintf(lastCanFrames[3], "359: %02X 00 %02X 00 %02X 00 00 00",
+            protections, alarms, modules);
+
+    // Trame 0x35C - Requêtes (toujours fixe)
     strcpy(lastCanFrames[4], "35C: C0 00 00 00 00 00 00 00");
 }
 
@@ -264,20 +336,29 @@ void showCanFrames()
     extern void drawTitle(const char *title);
 
     clearDisplay();
-    drawTitle("TRAMES CAN");
+    drawTitle("TRAMES CAN TEMPS REEL");
 
-    // Afficher les 4 trames sur 4 lignes
-    for (int i = 0; i < 4; i++)
+    // Afficher les 5 trames sur 5 lignes (ajusté pour tenir)
+    for (int i = 0; i < 5; i++)
     {
-        drawText(2, 25 + i * 10, lastCanFrames[i], false, false);
+        drawText(2, 20 + i * 9, lastCanFrames[i], false, false); // Espacement réduit
     }
 
+    // Indicateurs d'état en bas
+    char statusLine[30];
+    extern bool degradedMode;
+    sprintf(statusLine, "%s | %dBatt | %dA/%dA",
+            degradedMode ? "DEGRADE" : "NORMAL",
+            configuredBatteryCount,
+            (int)chargeCurrentSetpoint,
+            (int)dischargeCurrentSetpoint);
+    drawText(2, 62, statusLine, false, false);
+
     // Instructions
-    drawText(2, 64, "BACK: retour", false, false);
+    drawText(100, 62, "BACK", false, false);
 
     showDisplay();
 }
-
 void setCanDisplayActive(bool active)
 {
     canDisplayActive = active;
