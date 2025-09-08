@@ -143,9 +143,9 @@ void sendVoltageCurrentTemp()
     // Tension: 42.00V = 4200 = 0x1068
     // Courant: 0.0A = 0 = 0x0000
     // Température: 27.0°C = 270 = 0x010E
-    uint16_t voltage = 4200; // 42.00V en 0.01V
-    uint16_t current = 0;    // 0.0A
-    uint16_t temp = 270;     // 27.0°C en 0.1°C
+    uint16_t voltage = 4200;  // 42.00V en 0.01V
+    uint16_t current = 30000; // 0.0A
+    uint16_t temp = 270;      // 27.0°C en 0.1°C
 
     extern AggregateBatteryMetrics latestMetrics;
 
@@ -156,7 +156,7 @@ void sendVoltageCurrentTemp()
 
         // Courant: Conversion A vers 0.01A avec offset 30000
         // Positif = charge, Négatif = décharge
-        int16_t currentRaw = (int16_t)(latestMetrics.totalCurrent * 100);
+        int32_t currentRaw = (int32_t)(latestMetrics.totalCurrent * 10);
         current = (uint16_t)(currentRaw + 30000);
 
         // Température: Conversion °C vers 0.1°C (ex: 35.2°C → 352)

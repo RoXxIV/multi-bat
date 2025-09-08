@@ -13,22 +13,35 @@
 #define CMD_WRITE_MULTIPLE 0x10 // Écriture de registres multiples
 
 // Registres de données temps réel spécifiques
-#define REG_CELL_VOLTAGES_START 0x00   // Début tensions cellules (0x00~0x2F)
-#define REG_TEMPERATURES_START 0x30    // Début températures capteurs (0x30~0x37)
-#define REG_TOTAL_VOLTAGE 0x38         // Tension totale de la batterie
-#define REG_CURRENT 0x39               // Courant charge/décharge
-#define REG_SOC 0x3A                   // SOC
-#define REG_HEARTBEAT 0x3B             // Heartbeat
-#define REG_CELL_COUNT 0x3C            // Nombre de cellules
-#define REG_TEMP_SENSOR_COUNT 0x3D     // Nombre de capteurs de température
-#define REG_CHARGE_MOSFET 0x52         // État MOSFET de charge
-#define REG_DISCHARGE_MOSFET 0x53      // État MOSFET de décharge
-#define REG_MOS_TEMP 0x5A              // Température des MOSFET
-#define REG_FAULT_STATUS1 0x66         // État des défauts groupe 1
-#define REG_FAULT_STATUS2 0x67         // État des défauts groupe 2
-#define REG_FAULT_STATUS3 0x68         // État desodefauts groupe 3
+#define REG_TOTAL_VOLTAGE 0x38 // Tension totale de la batterie
+#define REG_CURRENT 0x39       // Courant charge/décharge
+#define REG_SOC 0x3A           // SOC
+// #define REG_HEARTBEAT 0x3B           // Heartbeat
+#define REG_CELL_COUNT 0x3C // Nombre de cellules
+// #define REG_TEMP_SENSOR_COUNT 0x3D // Nombre de capteurs de température
+#define REG_MAX_CELL_VOLTAGE 0x3E // Tension max d'une cellule (mV)
+// #define REG_MAX_CELL_V_NUM 0x3F   // Numéro de la cellule avec la tension max
+#define REG_MIN_CELL_VOLTAGE 0x40 // Tension min d'une cellule (mV)
+// #define REG_MIN_CELL_V_NUM 0x41   // Numéro de la cellule avec la tension min
+#define REG_CELL_V_DIFF 0x42   // Différence de tension max (mV)
+#define REG_MAX_CELL_TEMP 0x43 // Température max d'une cellule (°C)
+// #define REG_MAX_CELL_T_NUM 0x44 // Numéro du capteur avec la temp max
+#define REG_MIN_CELL_TEMP 0x45
+#define REG_CHARGE_MOSFET 0x52    // État MOSFET de charge
+#define REG_DISCHARGE_MOSFET 0x53 // État MOSFET de décharge
+// #define REG_MOS_TEMP 0x5A         // Température des MOSFET
+
 #define REG_SERIAL_NUMBER_START 0x018D // Début du numéro de série
 #define REG_SERIAL_NUMBER_COUNT 14     // Nombre de registres pour le S/N
+
+#define REG_WAKE_UP_SOURCE 0x6B   // Source du réveil
+#define REG_FAULT_CODE_0_1 0x6D   // Nouveaux codes défaut 0-1
+#define REG_FAULT_CODE_2_3 0x6E   // Nouveaux codes défaut 2-3
+#define REG_FAULT_CODE_4_5 0x6F   // Nouveaux codes défaut 4-5
+#define REG_FAULT_CODE_6_7 0x70   // Nouveaux codes défaut 6-7
+#define REG_FAULT_CODE_8_9 0x71   // Nouveaux codes défaut 8-9
+#define REG_FAULT_CODE_10_11 0x72 // Nouveaux codes défaut 10-11
+#define REG_FAULT_CODE_12_13 0x73 // Nouveaux codes défaut 12-13
 
 // Commandes d'affichage sur LCD batterie
 #define DISPLAY_ID_CMD 7 // Commande pour afficher ID

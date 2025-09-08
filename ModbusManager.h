@@ -10,21 +10,32 @@
 struct IndividualBatteryData
 {
     bool isValid;
-    char serialNumber[33]; // Pour stocker le S/N (16 registres * 2 chars/registre + 1 nul)
+    char serialNumber[33];
     float voltage;
     float current;
     float soc;
-    // Le SOH n'est pas dans les registres standards que nous avons identifiés.
+    uint16_t cellCount;
+    float maxCellVoltage;        // en V
+    float minCellVoltage;        // en V
+    float cellVoltageDifference; // en V
+    float maxCellTemp;           // en °C
+    float minCellTemp;           // en °C
+
     bool chargeMosfetStatus;
     bool dischargeMosfetStatus;
+    float mosTemp;
+    float currentLimit;
     float temp1;
     float temp2;
-    float mosTemp;
-    uint16_t heartbeat;
-    float currentLimit;
-    float cellVoltages[16]; // Conçu pour 16 cellules, à ajuster si besoin.
-    float cellVoltageDifference;
-    // Les autres données (volt diff, S/N, etc.) ne sont pas dans les registres standards.
+
+    uint16_t wakeUpSource;
+    uint16_t faultCode0_1;
+    uint16_t faultCode2_3;
+    uint16_t faultCode4_5;
+    uint16_t faultCode6_7;
+    uint16_t faultCode8_9;
+    uint16_t faultCode10_11;
+    uint16_t faultCode12_13;
 };
 // Structure pour stocker les données consolidées de l'ensemble du parc de batteries.
 struct AggregateBatteryMetrics

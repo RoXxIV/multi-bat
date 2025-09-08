@@ -14,7 +14,6 @@ SystemError systemErrors[MAX_SYSTEM_ERRORS];
 int errorCount = 0;
 
 // ——————— INITIALISATION ET SYSTÈME ———————
-
 void initBatteryManagement()
 {
     Serial.println("=== INITIALISATION GESTION BATTERIES ===");
@@ -22,16 +21,17 @@ void initBatteryManagement()
     // Initialisation des états des batteries
     for (int i = 0; i < MAX_BATTERIES; i++)
     {
+        // logique individuelle
         batteryStates[i].isResponding = false;
         batteryStates[i].lastResponseTime = 0;
         batteryStates[i].status = BATTERY_NOT_RESPONDING;
-        batteryStates[i].activeLimitation = NO_LIMITATION;
-        batteryStates[i].isActive = false;
-        batteryStates[i].voltageDelta = 0.0f;
+        batteryStates[i].activeLimitation = NO_LIMITATION; // limitation de courant
+        batteryStates[i].isActive = false;                 // vvv
+        batteryStates[i].voltageDelta = 0.0f;              // delta de tension avec la batterie la plus chargé ?
         batteryStates[i].lastMosfetCheck = 0;
     }
 
-    // Initialisation du diagnostic système
+    // Initialisation du diagnostic système (parmi toutes les batteries)
     systemDiag.degradedMode = false;
     systemDiag.activeBatteryCount = 0;
     systemDiag.respondingBatteryCount = 0;
@@ -39,9 +39,9 @@ void initBatteryManagement()
     systemDiag.minBatteryVoltage = 999.0f;
     systemDiag.maxBatteryTemp = -100.0f;
     systemDiag.minBatteryTemp = 999.0f;
-    systemDiag.lastDiagnostic = 0;
+    systemDiag.lastDiagnostic = 0; // timestamp du dernier diagnostic
 
-    // Initialisation des consignes
+    // Initialisation des consignes en charge et en décharge
     currentChargeSetpoint = 0.0f;
     currentDischargeSetpoint = 0.0f;
 
@@ -62,28 +62,20 @@ void runBatteryManagementCycle()
 {
     Serial.println("\n=== CYCLE GESTION INTELLIGENTE BATTERIES ===");
 
-    // Mise à jour des deltas de tension
-    updateVoltageDeltas();
-
-    // Gestion des limitations individuelles
-    manageBatteryLimitations();
-
-    // Gestion de l'activation des batteries
-    manageBatteryActivation();
-
-    // Calcul des moyennes et agrégation
-    calculateAverages();
+    updateVoltageDeltas();      // Mise à jour des deltas de tension
+    checkMosfetStatus();        // Vérification MOSFETs
+    manageBatteryLimitations(); // Gestion des limitations individuelles
+    manageBatteryActivation();  // Gestion de l'activation des batteries
+    calculateAverages();        // Calcul des moyennes et agrégation
 
     // Calcul des nouvelles consignes
     currentChargeSetpoint = calculateChargeSetpoint();
     currentDischargeSetpoint = calculateDischargeSetpoint();
 
-    // Mise à jour des LEDs d'état
-    updateStatusLeds();
+    updateStatusLeds(); // Mise à jour des LEDs d'état
 
     Serial.printf("CYCLE TERMINÉ - Consignes: Charge=%.1fA Décharge=%.1fA\n",
                   currentChargeSetpoint, currentDischargeSetpoint);
-    Serial.println("================================================\n");
 }
 
 void printSystemStatus()
@@ -228,7 +220,6 @@ void updateSystemMetrics()
 }
 
 // ——————— GESTION DES CONNEXIONS ET SURVEILLANCE ———————
-
 void monitorBatteryConnections()
 {
     static unsigned long lastConnectionCheck = 0;
@@ -963,117 +954,99 @@ float calculateChargeSetpoint()
     float setpoint = 0.0f;
     static char reason[150] = "";
 
-    // Variables pour l'analyse des conditions
-    float maxCellVoltage = 0.0f;
-    float minCellVoltage = 5.0f;
-    float totalBatteryTemp = 0.0f;
-    float maxMosTemp = 0.0f;
-    int validBatteries = 0;
-    bool hasCellAbove3480 = false;
-    bool hasCellAbove3450 = false;
-    bool hasCellBelow3000 = false;
-
-    // Analyser toutes les batteries répondantes pour trouver les conditions critiques
+    // On vérifie si UN SEUL MOSFET de charge est ouvert.
     for (int i = 0; i < configuredBatteryCount; i++)
     {
-        BatteryState *state = &batteryStates[i];
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (batteryStates[i].isResponding && data->isValid && !data->chargeMosfetStatus)
+        {
+            // Si un MOSFET est OFF, la consigne de charge pour TOUT le système est 0.
+            Serial.println("SÉCURITÉ: MOSFET Charge OFF détecté. Consigne de charge globale = 0A.");
+            return 0.0f; // On arrête tout et on renvoie 0.
+        }
+    }
 
-        if (!state->isResponding || !data->isValid)
+    float maxCellVoltageGlobal = 0.0f;
+    float minCellVoltageGlobal = 5.0f;
+    float highestAvgBatteryTemp = -100.0f; // Garde la T° moyenne la plus chaude
+
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (!batteryStates[i].isResponding || !data->isValid)
             continue;
 
-        validBatteries++;
-
-        // Analyser les tensions des 15 cellules de cette batterie
-        for (int cell = 0; cell < 15; cell++)
+        if (data->cellCount != 15)
         {
-            float cellVoltage = data->cellVoltages[cell];
-
-            // Vérifier les seuils critiques
-            if (cellVoltage > 3.480f)
-                hasCellAbove3480 = true;
-            if (cellVoltage > 3.450f)
-                hasCellAbove3450 = true;
-            if (cellVoltage < 3.000f)
-                hasCellBelow3000 = true;
-
-            // Garder les valeurs min/max pour debug
-            if (cellVoltage > maxCellVoltage)
-                maxCellVoltage = cellVoltage;
-            if (cellVoltage < minCellVoltage)
-                minCellVoltage = cellVoltage;
+            batteryStates[i].status = BATTERY_BMS_FAULT;                                 // Marquer la batterie comme défectueuse
+            addSystemError(ERROR_CELL_IMBALANCE, i + 2, "Erreur BMS: Cell count != 15"); // Ajouter une erreur système
+            return 0.0f;                                                                 // Règle de sécurité prioritaire : arrêter toute charge
         }
-
-        // Accumuler les températures des batteries
-        totalBatteryTemp += (data->temp1 + data->temp2) / 2.0f;
-
-        // Température MOS maximum
-        if (data->mosTemp > maxMosTemp)
-            maxMosTemp = data->mosTemp;
+        else if (batteryStates[i].status == BATTERY_BMS_FAULT)
+        {
+            // Si l'erreur a été résolue, on la retire
+            removeSystemError(ERROR_CELL_IMBALANCE, i + 2);
+        }
     }
 
-    // Calculer la température moyenne des batteries
-    float avgBatteryTemp = (validBatteries > 0) ? totalBatteryTemp / validBatteries : 0.0f;
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (!batteryStates[i].isResponding || !data->isValid)
+            continue;
 
-    // ————————— LOGIQUE ELSE-IF EXACTE SELON VOS CONSIGNES —————————
+        // Suivi des tensions min/max globales
+        if (data->maxCellVoltage > maxCellVoltageGlobal)
+            maxCellVoltageGlobal = data->maxCellVoltage;
+        if (data->minCellVoltage < minCellVoltageGlobal)
+            minCellVoltageGlobal = data->minCellVoltage;
 
-    if (hasCellAbove3480) // Dès qu'une cellule > 3480mV
+        // --- NOUVELLE LOGIQUE DE TEMPÉRATURE ---
+        // 1. Calculer la T° moyenne de CETTE batterie
+        float currentBatteryAvgTemp = (data->maxCellTemp + data->minCellTemp) / 2.0f;
+        // 2. Garder la plus haute T° moyenne rencontrée
+        if (currentBatteryAvgTemp > highestAvgBatteryTemp)
+        {
+            highestAvgBatteryTemp = currentBatteryAvgTemp;
+        }
+    }
+
+    // --- MISE À JOUR DE LA LOGIQUE DE DÉCISION ---
+    if (maxCellVoltageGlobal > MAX_CHARGE_CELL_VOLTAGE)
     {
         setpoint = 0.0f;
-        snprintf(reason, sizeof(reason),
-                 "Cellule > 3.480V - ARRÊT CHARGE (max trouvée: %.3fV)",
-                 maxCellVoltage);
+        snprintf(reason, sizeof(reason), "Cellule > %.3fV - ARRET CHARGE", MAX_CHARGE_CELL_VOLTAGE);
     }
-    else if (degradedMode) // Si le mode dégradé est vrai
+    else if (highestAvgBatteryTemp > MAX_CHARGE_TEMP) // NOUVELLE RÈGLE PRIORITAIRE
     {
-        setpoint = DEGRADED_MODE_CURRENT; // 10.0f;
-        snprintf(reason, sizeof(reason), "Mode dégradé actif");
+        setpoint = 0.0f;
+        snprintf(reason, sizeof(reason), "T° Moy Max %.1f°C > %.0f°C - ARRET CHARGE", highestAvgBatteryTemp, MAX_CHARGE_TEMP);
     }
-    else if (hasCellAbove3450) // Dès qu'une cellule > 3450mV
+    else if (degradedMode)
     {
-        setpoint = LIMITED_CURRENT_PER_BATTERY * activeBatteryCount; // 10.0f;
-        snprintf(reason, sizeof(reason),
-                 "Cellule > 3.450V - LIMITATION (max: %.3fV, %d batt actives)",
-                 maxCellVoltage, activeBatteryCount);
+        setpoint = DEGRADED_MODE_CURRENT * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "Mode dégradé actif (%d batt)", activeBatteryCount);
     }
-    else if (hasCellBelow3000) // Dès qu'une cellule < 3000mV
+    else if (maxCellVoltageGlobal > HIGH_CHARGE_CELL_VOLTAGE)
     {
-        setpoint = 10.0f * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Cellule < 3.000V - LIMITATION (min: %.3fV, %d batt actives)",
-                 minCellVoltage, activeBatteryCount);
+        setpoint = LIMITED_CURRENT_PER_BATTERY * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "Cellule > %.3fV - LIMITATION", HIGH_CHARGE_CELL_VOLTAGE);
     }
-    else if (avgBatteryTemp < 8.0f || avgBatteryTemp > 45.0f) // Température hors plage
+    else if (minCellVoltageGlobal < LOW_CELL_VOLTAGE)
     {
         setpoint = 10.0f * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Temp batteries %.1f°C hors [8-45°C] (%d batt actives)",
-                 avgBatteryTemp, activeBatteryCount);
+        snprintf(reason, sizeof(reason), "Cellule < %.3fV - LIMITATION", LOW_CELL_VOLTAGE);
     }
-    else if (maxMosTemp > 80.0f) // Temp MOS > 80°C
+    else if (highestAvgBatteryTemp < MIN_CHARGE_TEMP) // RÈGLE MISE À JOUR
     {
-        setpoint = 10.0f * configuredBatteryCount; // "nb de batteries" dans consignes
-        snprintf(reason, sizeof(reason),
-                 "Temp MOS %.1f°C > 80°C (%d batteries total)",
-                 maxMosTemp, configuredBatteryCount);
+        setpoint = 10.0f * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "T° Moy Max %.1f°C < %.0f°C - LIMITATION", highestAvgBatteryTemp, MIN_CHARGE_TEMP);
     }
-    else // Conditions normales
+    else
     {
         setpoint = NORMAL_CURRENT_PER_BATTERY * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Conditions normales (%d batt actives)",
-                 activeBatteryCount);
+        snprintf(reason, sizeof(reason), "Conditions normales");
     }
-
-    // Logs détaillés
-    Serial.printf("CONSIGNE CHARGE: %.1fA (%s)\n", setpoint, reason);
-    Serial.printf("  Analyse: MaxCell=%.3fV MinCell=%.3fV TempMoy=%.1f°C MaxMOS=%.1f°C\n",
-                  maxCellVoltage, minCellVoltage, avgBatteryTemp, maxMosTemp);
-    Serial.printf("  Flags: >3480=%s >3450=%s <3000=%s Dégradé=%s\n",
-                  hasCellAbove3480 ? "OUI" : "NON",
-                  hasCellAbove3450 ? "OUI" : "NON",
-                  hasCellBelow3000 ? "OUI" : "NON",
-                  degradedMode ? "OUI" : "NON");
 
     return setpoint;
 }
@@ -1086,110 +1059,87 @@ float calculateDischargeSetpoint()
     float setpoint = 0.0f;
     static char reason[150] = "";
 
-    // Variables pour l'analyse des conditions
-    float minCellVoltage = 5.0f;
-    float maxCellVoltage = 0.0f;
-    float totalBatteryTemp = 0.0f;
-    float maxMosTemp = 0.0f;
-    int validBatteries = 0;
-    bool hasCellBelow2750 = false;
-    bool hasCellBelow3000 = false;
-
-    // Analyser toutes les batteries répondantes
+    // On vérifie si UN SEUL MOSFET de décharge est ouvert.
     for (int i = 0; i < configuredBatteryCount; i++)
     {
-        BatteryState *state = &batteryStates[i];
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (batteryStates[i].isResponding && data->isValid && !data->dischargeMosfetStatus)
+        {
+            // Si un MOSFET est OFF, la consigne de décharge pour TOUT le système est 0.
+            Serial.println("SÉCURITÉ: MOSFET Décharge OFF détecté. Consigne de décharge globale = 0A.");
+            return 0.0f; // On arrête tout et on renvoie 0.
+        }
+    }
 
-        if (!state->isResponding || !data->isValid)
+    float minCellVoltageGlobal = 5.0f;
+    float highestAvgBatteryTemp = -100.0f; // Garde la T° moyenne la plus chaude
+
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (!batteryStates[i].isResponding || !data->isValid)
             continue;
 
-        validBatteries++;
-
-        // Analyser les tensions des 15 cellules de cette batterie
-        for (int cell = 0; cell < 15; cell++)
+        if (data->minCellVoltage < minCellVoltageGlobal)
+            minCellVoltageGlobal = data->minCellVoltage;
+        float currentBatteryAvgTemp = (data->maxCellTemp + data->minCellTemp) / 2.0f;
+        if (currentBatteryAvgTemp > highestAvgBatteryTemp)
         {
-            float cellVoltage = data->cellVoltages[cell];
-
-            // Vérifier les seuils critiques
-            if (cellVoltage < 2.750f)
-                hasCellBelow2750 = true;
-            if (cellVoltage < 3.000f)
-                hasCellBelow3000 = true;
-
-            // Garder les valeurs min/max pour debug
-            if (cellVoltage < minCellVoltage)
-                minCellVoltage = cellVoltage;
-            if (cellVoltage > maxCellVoltage)
-                maxCellVoltage = cellVoltage;
+            highestAvgBatteryTemp = currentBatteryAvgTemp;
         }
-
-        // Accumuler les températures des batteries
-        totalBatteryTemp += (data->temp1 + data->temp2) / 2.0f;
-
-        // Température MOS maximum
-        if (data->mosTemp > maxMosTemp)
-            maxMosTemp = data->mosTemp;
     }
 
-    // Calculer la température moyenne des batteries
-    float avgBatteryTemp = (validBatteries > 0) ? totalBatteryTemp / validBatteries : 0.0f;
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (!batteryStates[i].isResponding || !data->isValid)
+            continue;
 
-    // ————————— LOGIQUE ELSE-IF EXACTE SELON VOS CONSIGNES —————————
+        if (data->minCellVoltage < minCellVoltageGlobal)
+            minCellVoltageGlobal = data->minCellVoltage;
 
-    if (hasCellBelow2750) // Dès qu'une cellule < 2750mV
+        // --- NOUVELLE LOGIQUE DE TEMPÉRATURE ---
+        float currentBatteryAvgTemp = (data->maxCellTemp + data->minCellTemp) / 2.0f;
+        if (currentBatteryAvgTemp > highestAvgBatteryTemp)
+        {
+            highestAvgBatteryTemp = currentBatteryAvgTemp;
+        }
+    }
+
+    // --- MISE À JOUR DE LA LOGIQUE DE DÉCISION ---
+    if (minCellVoltageGlobal < MIN_DISCHARGE_CELL_VOLTAGE)
     {
         setpoint = 0.0f;
-        snprintf(reason, sizeof(reason),
-                 "Cellule < 2.750V - ARRÊT DÉCHARGE (min trouvée: %.3fV)",
-                 minCellVoltage);
+        snprintf(reason, sizeof(reason), "Cellule < %.3fV - ARRET DECHARGE", MIN_DISCHARGE_CELL_VOLTAGE);
     }
-    else if (degradedMode) // Si le mode dégradé est vrai
+    else if (highestAvgBatteryTemp > MAX_DISCHARGE_TEMP) // NOUVELLE RÈGLE PRIORITAIRE
     {
-        setpoint = 10.0f;
-        snprintf(reason, sizeof(reason), "Mode dégradé actif");
+        setpoint = 0.0f;
+        snprintf(reason, sizeof(reason), "T° Moy Max %.1f°C > %.0f°C - ARRET DECHARGE", highestAvgBatteryTemp, MAX_DISCHARGE_TEMP);
     }
-    else if (hasCellBelow3000) // Dès qu'une cellule < 3000mV
+    else if (degradedMode)
     {
-        setpoint = 10.0f * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Cellule < 3.000V - LIMITATION (min: %.3fV, %d batt actives)",
-                 minCellVoltage, activeBatteryCount);
+        setpoint = DEGRADED_MODE_CURRENT * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "Mode dégradé actif (%d batt)", activeBatteryCount);
     }
-    else if (avgBatteryTemp < 3.0f || avgBatteryTemp > 50.0f) // Température hors plage
+    else if (minCellVoltageGlobal < LOW_CELL_VOLTAGE)
     {
         setpoint = 10.0f * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Temp batteries %.1f°C hors [3-50°C] (%d batt actives)",
-                 avgBatteryTemp, activeBatteryCount);
+        snprintf(reason, sizeof(reason), "Cellule < %.3fV - LIMITATION", LOW_CELL_VOLTAGE);
     }
-    else if (maxMosTemp > 80.0f) // Temp MOS > 80°C
+    else if (highestAvgBatteryTemp < MIN_DISCHARGE_TEMP) // RÈGLE MISE À JOUR
     {
-        setpoint = 10.0f * configuredBatteryCount; // "nb de batteries" dans consignes
-        snprintf(reason, sizeof(reason),
-                 "Temp MOS %.1f°C > 80°C (%d batteries total)",
-                 maxMosTemp, configuredBatteryCount);
+        setpoint = 10.0f * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "T° Moy Max %.1f°C < %.0f°C - LIMITATION", highestAvgBatteryTemp, MIN_DISCHARGE_TEMP);
     }
-    else // Conditions normales
+    else
     {
-        setpoint = 150.0f * activeBatteryCount;
-        snprintf(reason, sizeof(reason),
-                 "Conditions normales (%d batt actives)",
-                 activeBatteryCount);
+        setpoint = NORMAL_CURRENT_PER_BATTERY * activeBatteryCount;
+        snprintf(reason, sizeof(reason), "Conditions normales");
     }
-
-    // Logs détaillés
-    Serial.printf("CONSIGNE DÉCHARGE: %.1fA (%s)\n", setpoint, reason);
-    Serial.printf("  Analyse: MinCell=%.3fV MaxCell=%.3fV TempMoy=%.1f°C MaxMOS=%.1f°C\n",
-                  minCellVoltage, maxCellVoltage, avgBatteryTemp, maxMosTemp);
-    Serial.printf("  Flags: <2750=%s <3000=%s Dégradé=%s\n",
-                  hasCellBelow2750 ? "OUI" : "NON",
-                  hasCellBelow3000 ? "OUI" : "NON",
-                  degradedMode ? "OUI" : "NON");
 
     return setpoint;
 }
-
 // ——————— MOYENNES ET AGRÉGATION ———————
 
 void calculateAverages()
@@ -1303,59 +1253,39 @@ uint8_t calculateSystemAlarms()
 uint8_t calculateSystemProtections()
 {
     uint8_t protections = 0x00;
-
-    // Analyser les batteries pour détecter les protections actives
     extern int configuredBatteryCount;
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     for (int i = 0; i < configuredBatteryCount; i++)
     {
-        BatteryState *state = &batteryStates[i];
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
-
-        if (!state->isResponding || !data->isValid)
+        if (!batteryStates[i].isResponding || !data->isValid)
             continue;
 
-        // Vérifier les tensions cellules pour protections
-        for (int cell = 0; cell < 15; cell++)
+        if (data->maxCellVoltage > MAX_CHARGE_CELL_VOLTAGE)
         {
-            float cellVoltage = data->cellVoltages[cell];
-
-            // Protection surtension cellule
-            if (cellVoltage > MAX_CHARGE_CELL_VOLTAGE)
-            {
-                protections |= 0x10; // Bit 4: Protection surtension
-            }
-
-            // Protection sous-tension cellule
-            if (cellVoltage < MIN_DISCHARGE_CELL_VOLTAGE)
-            {
-                protections |= 0x08; // Bit 3: Protection sous-tension
-            }
+            protections |= 0x10; // Bit 4: Protection surtension
         }
-
-        // Protection surtempérature
-        if (data->temp1 > MAX_DISCHARGE_TEMP || data->temp2 > MAX_DISCHARGE_TEMP)
+        if (data->minCellVoltage < MIN_DISCHARGE_CELL_VOLTAGE)
+        {
+            protections |= 0x08; // Bit 3: Protection sous-tension
+        }
+        if (data->maxCellTemp > MAX_DISCHARGE_TEMP)
         {
             protections |= 0x04; // Bit 2: Protection température
         }
-
-        // Protection MOSFET
         if (!data->chargeMosfetStatus || !data->dischargeMosfetStatus)
         {
             protections |= 0x02; // Bit 1: Protection MOSFET
         }
     }
 
-    // Protection mode dégradé global
     if (degradedMode)
     {
         protections |= 0x01; // Bit 0: Protection système
     }
-
     return protections;
 }
-
 // ——————— FONCTIONS UTILITAIRES ———————
 
 int findHighestVoltageBattery()

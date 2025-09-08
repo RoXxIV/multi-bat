@@ -24,126 +24,82 @@ void initModbus()
 
 // ——————— FONCTIONS DE LECTURE ———————
 
-void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatteryMetrics *metrics)
-{
-    metrics->isDataValid = false;
-    if (configuredBatteryCount == 0)
-        return;
-
-    Serial.printf("\n--- LECTURE AGRÉGÉE DE %d BATTERIE(S) ---\n", configuredBatteryCount);
-
-    float totalSoc = 0.0f, totalVoltage = 0.0f, totalCurrent = 0.0f, totalTemp = 0.0f;
-    int successfulReads = 0;
-
-    for (int i = 0; i < configuredBatteryCount; i++)
-    {
-        uint8_t currentBatteryId = i + 2;
-
-        const uint16_t startAddr = REG_TOTAL_VOLTAGE; // 0x38
-        const uint16_t endAddr = REG_MOS_TEMP;        // 0x5A
-        const uint16_t regCount = endAddr - startAddr + 1;
-        uint8_t payload[regCount * 2]; // Buffer pour stocker uniquement les données utiles
-
-        // Remplacement de tout le code de communication par un seul appel à la lib
-        int bytesRead = modbus_read_registers(currentBatteryId, startAddr, regCount, payload);
-
-        if (bytesRead > 0)
-        {
-            // La lib a déjà validé le CRC. On peut décoder les données directement.
-            // Les offsets sont calculés par rapport au début du bloc lu (0x38).
-            totalVoltage += ((payload[0] << 8) | payload[1]) / 10.0f;
-            totalCurrent += (((int16_t)((payload[2] << 8) | payload[3])) - 30000) * 0.1f;
-            totalSoc += ((payload[4] << 8) | payload[5]) / 10.0f;
-
-            const int tempOffset = (REG_MOS_TEMP - REG_TOTAL_VOLTAGE) * 2;
-            totalTemp += (((payload[tempOffset] << 8) | payload[tempOffset + 1])) - 40.0f;
-
-            successfulReads++;
-        }
-    }
-
-    if (successfulReads > 0)
-    {
-        metrics->averageSoc = totalSoc / successfulReads;
-        metrics->averageVoltage = totalVoltage / successfulReads;
-        metrics->totalCurrent = totalCurrent;
-        metrics->averageTemp = totalTemp / successfulReads;
-        metrics->isDataValid = true;
-
-        Serial.printf("--- RÉSULTAT AGRÉGÉ (%d/%d batteries) ---\n", successfulReads, configuredBatteryCount);
-        Serial.printf("  - SOC Moyen: %.1f%%\n", metrics->averageSoc);
-        Serial.printf("  - Tension Moyenne: %.1fV\n", metrics->averageVoltage);
-        Serial.printf("  - Courant Total: %.1fA\n", metrics->totalCurrent);
-        Serial.printf("  - Temp. Moyenne: %.1f°C\n", metrics->averageTemp);
-    }
-    else
-    {
-        Serial.println("ERREUR: Aucune batterie n'a répondu correctement à la lecture agrégée.");
-    }
-}
-
 void updateIndividualBatteryMetrics(uint8_t batteryId)
 {
     IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
     batteryData->isValid = false;
 
-    const uint16_t startAddr = 0x00;
-    const uint16_t endAddr = 0x60;
-    const uint16_t regCount = endAddr - startAddr + 1;
-    uint8_t payload[regCount * 2]; // Buffer assez grand pour toutes les données
+    // --- LECTURE BLOC 1 (Données principales : 0x38 -> 0x45) ---
+    const uint16_t startAddr1 = REG_TOTAL_VOLTAGE;
+    const uint16_t regCount1 = (REG_MIN_CELL_TEMP - REG_TOTAL_VOLTAGE) + 1;
+    uint8_t payload1[regCount1 * 2];
+    int bytesRead1 = modbus_read_registers(batteryId, startAddr1, regCount1, payload1);
 
-    // Un seul appel à la librairie pour lire toutes les données
-    int bytesRead = modbus_read_registers(batteryId, startAddr, regCount, payload);
+    // --- LECTURE BLOC 2 (MOSFETs : 0x52 -> 0x53) ---
+    const uint16_t startAddr2 = REG_CHARGE_MOSFET;
+    const uint16_t regCount2 = 2;
+    uint8_t payload2[regCount2 * 2];
+    int bytesRead2 = modbus_read_registers(batteryId, startAddr2, regCount2, payload2);
 
-    if (bytesRead > 0)
+    // --- LECTURE BLOC 3 (Codes défaut : 0x6B -> 0x73) ---
+    const uint16_t startAddr3 = REG_WAKE_UP_SOURCE;
+    const uint16_t regCount3 = (REG_FAULT_CODE_12_13 - REG_WAKE_UP_SOURCE) + 1;
+    uint8_t payload3[regCount3 * 2];
+    int bytesRead3 = modbus_read_registers(batteryId, startAddr3, regCount3, payload3);
+
+    // --- DÉCODAGE ET VALIDATION ---
+    // Si une batterie repond correctement aux trois blocs, elle renvoie forcement le double de bits
+    if (bytesRead1 == (regCount1 * 2) && bytesRead2 == (regCount2 * 2) && bytesRead3 == (regCount3 * 2))
     {
-        // La librairie a fait tout le travail de validation. On décode.
-        // Les offsets sont calculés par rapport à startAddr (0x00), donc ils fonctionnent directement.
+        int offset;
 
-        // Tensions des 15 cellules
-        for (int i = 0; i < 15; i++)
-        {
-            batteryData->cellVoltages[i] = ((payload[i * 2] << 8) | payload[i * 2 + 1]) / 1000.0f;
-        }
+        // --- Décodage du BLOC 1 (Données principales) ---
+        offset = (REG_TOTAL_VOLTAGE - startAddr1) * 2;
+        batteryData->voltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 100.0f;
+        offset = (REG_CURRENT - startAddr1) * 2;
+        batteryData->current = (((int16_t)((payload1[offset] << 8) | payload1[offset + 1])) - 30000) * 0.1f;
+        offset = (REG_SOC - startAddr1) * 2;
+        batteryData->soc = ((payload1[offset] << 8) | payload1[offset + 1]) / 10.0f;
+        offset = (REG_CELL_COUNT - startAddr1) * 2;
+        batteryData->cellCount = (payload1[offset] << 8) | payload1[offset + 1];
+        offset = (REG_MAX_CELL_VOLTAGE - startAddr1) * 2;
+        batteryData->maxCellVoltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
+        offset = (REG_MIN_CELL_VOLTAGE - startAddr1) * 2;
+        batteryData->minCellVoltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
+        offset = (REG_CELL_V_DIFF - startAddr1) * 2;
+        batteryData->cellVoltageDifference = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
+        offset = (REG_MAX_CELL_TEMP - startAddr1) * 2;
+        batteryData->maxCellTemp = (((payload1[offset] << 8) | payload1[offset + 1])) - 40.0f;
+        offset = (REG_MIN_CELL_TEMP - startAddr1) * 2;
+        batteryData->minCellTemp = (((payload1[offset] << 8) | payload1[offset + 1])) - 40.0f;
 
-        // Températures 1 et 2
-        int tempOffset = (REG_TEMPERATURES_START - startAddr) * 2;
-        batteryData->temp1 = (((payload[tempOffset] << 8) | payload[tempOffset + 1])) - 40.0f;
-        batteryData->temp2 = (((payload[tempOffset + 2] << 8) | payload[tempOffset + 3])) - 40.0f;
+        // --- Décodage du BLOC 2 (MOSFETs) ---
+        batteryData->chargeMosfetStatus = (payload2[1] & 0x01) != 0;
+        batteryData->dischargeMosfetStatus = (payload2[3] & 0x01) != 0;
 
-        // Tension, Courant, SOC
-        int mainMetricsOffset = (REG_TOTAL_VOLTAGE - startAddr) * 2;
-        batteryData->voltage = ((payload[mainMetricsOffset] << 8) | payload[mainMetricsOffset + 1]) / 10.0f;
-        batteryData->current = (((int16_t)((payload[mainMetricsOffset + 2] << 8) | payload[mainMetricsOffset + 3])) - 30000) * 0.1f;
-        batteryData->soc = ((payload[mainMetricsOffset + 4] << 8) | payload[mainMetricsOffset + 5]) / 10.0f;
-
-        // Heartbeat
-        int heartbeatOffset = (REG_HEARTBEAT - startAddr) * 2;
-        batteryData->heartbeat = (payload[heartbeatOffset] << 8) | payload[heartbeatOffset + 1];
-
-        // Différence de tension entre cellules
-        const int diffOffset = (0x42 - startAddr) * 2;
-        batteryData->cellVoltageDifference = ((payload[diffOffset] << 8) | payload[diffOffset + 1]) / 1000.0f;
-
-        // Statut des MOSFETs
-        int mosfetOffset = (REG_CHARGE_MOSFET - startAddr) * 2;
-        batteryData->chargeMosfetStatus = (payload[mosfetOffset + 1] & 0x01) != 0;
-        batteryData->dischargeMosfetStatus = (payload[mosfetOffset + 3] & 0x01) != 0;
-
-        // Température MOS
-        int mosTempOffset = (REG_MOS_TEMP - startAddr) * 2;
-        batteryData->mosTemp = (((payload[mosTempOffset] << 8) | payload[mosTempOffset + 1])) - 40.0f;
-
-        // Limite de courant
-        const int limitOffset = (0x60 - startAddr) * 2;
-        batteryData->currentLimit = (((int16_t)((payload[limitOffset] << 8) | payload[limitOffset + 1])) - 30000) * 0.1f;
+        // --- Décodage du BLOC 3 (Codes défaut) ---
+        offset = (REG_WAKE_UP_SOURCE - startAddr3) * 2;
+        batteryData->wakeUpSource = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_0_1 - startAddr3) * 2;
+        batteryData->faultCode0_1 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_2_3 - startAddr3) * 2;
+        batteryData->faultCode2_3 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_4_5 - startAddr3) * 2;
+        batteryData->faultCode4_5 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_6_7 - startAddr3) * 2;
+        batteryData->faultCode6_7 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_8_9 - startAddr3) * 2;
+        batteryData->faultCode8_9 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_10_11 - startAddr3) * 2;
+        batteryData->faultCode10_11 = (payload3[offset] << 8) | payload3[offset + 1];
+        offset = (REG_FAULT_CODE_12_13 - startAddr3) * 2;
+        batteryData->faultCode12_13 = (payload3[offset] << 8) | payload3[offset + 1];
 
         batteryData->isValid = true;
-        Serial.printf("INFO: Données détaillées de la batterie ID=%d mises à jour.\n", batteryId);
     }
     else
     {
-        Serial.printf("ERREUR: Impossible de lire les données individuelles de la batterie ID=%d\n", batteryId);
+        Serial.printf("ERREUR: Échec lecture des blocs de données pour ID=%d (B1:%d, B2:%d, B3:%d)\n", batteryId, bytesRead1, bytesRead2, bytesRead3);
     }
 }
 
@@ -267,36 +223,23 @@ bool changeAllBatteriesToId1()
 // ——————— FONCTIONS UTILITAIRES ———————
 void printIndividualBatteryData(uint8_t batteryId)
 {
-    // Cible la bonne structure dans le tableau global
     IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
-
-    // Affiche un en-tête pour identifier la batterie
     Serial.printf("\n--- DEBUG: Données Batterie ID=%d ---\n", batteryId);
 
-    // Vérifie si les données sont valides avant de les afficher
     if (!batteryData->isValid)
     {
         Serial.println("  /!\\ Données invalides ou non encore lues.");
         return;
     }
 
-    // Affiche chaque information avec son unité
     Serial.printf("  - Statut           : VALIDE\n");
     Serial.printf("  - Tension          : %.2f V\n", batteryData->voltage);
     Serial.printf("  - Courant          : %.2f A\n", batteryData->current);
     Serial.printf("  - SOC              : %.1f %%\n", batteryData->soc);
     Serial.printf("  - MOSFET Charge    : %s\n", batteryData->chargeMosfetStatus ? "ON" : "OFF");
     Serial.printf("  - MOSFET Décharge  : %s\n", batteryData->dischargeMosfetStatus ? "ON" : "OFF");
-    Serial.printf("  - Température 1    : %.1f C\n", batteryData->temp1);
-    Serial.printf("  - Température 2    : %.1f C\n", batteryData->temp2);
-    Serial.printf("  - Température MOS  : %.1f C\n", batteryData->mosTemp);
-    Serial.printf("  - Heartbeat        : %u\n", batteryData->heartbeat);
-
-    // Affiche les tensions des 4 premières cellules pour un aperçu rapide
-    Serial.printf("  - Cellules (1-4)   : %.3fV | %.3fV | %.3fV | %.3fV\n",
-                  batteryData->cellVoltages[0],
-                  batteryData->cellVoltages[1],
-                  batteryData->cellVoltages[2],
-                  batteryData->cellVoltages[3]);
+    Serial.printf("  - Temp Max/Min     : %.1f C / %.1f C\n", batteryData->maxCellTemp, batteryData->minCellTemp);
+    Serial.printf("  - Cell V Max/Min   : %.3f V / %.3f V\n", batteryData->maxCellVoltage, batteryData->minCellVoltage);
+    Serial.printf("  - Cell V Diff      : %.3f V\n", batteryData->cellVoltageDifference);
     Serial.println("------------------------------------");
 }

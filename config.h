@@ -126,7 +126,8 @@ enum BatteryStatus
     BATTERY_MOSFET_ISSUE = 2,   // Problème MOSFET
     BATTERY_TEMP_ISSUE = 3,     // Problème température
     BATTERY_VOLTAGE_ISSUE = 4,  // Problème tension
-    BATTERY_CELL_IMBALANCE = 5  // Déséquilibre cellules
+    BATTERY_CELL_IMBALANCE = 5, // Déséquilibre cellules
+    BATTERY_BMS_FAULT = 6       // Erreur interne du BMS
 };
 
 // ——————— STRUCTURES DE DONNÉES ———————

@@ -751,10 +751,10 @@ void finalizePairing(int batteriesConfigured)
 
         // Petite pause pour ne pas surcharger le bus Modbus
         delay(500);
-        saveBatteryCount(batteriesConfigured);
         showMessage("SUCCES", "Configuration OK !");
         delay(2000);
     }
+    saveBatteryCount(batteriesConfigured);
 
     Serial.println("=== FINALISATION TERMINEE ===");
 }
