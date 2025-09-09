@@ -74,6 +74,8 @@
 #define BATTERY_RESPONSE_TIMEOUT 5000        // Timeout réponse batterie (ms)
 #define MOSFET_RECOVERY_CHECK_INTERVAL 30000 // Intervalle vérification récupération MOSFET (ms)
 
+extern int configuredBatteryCount; // Nombre de batteries configurées par l'utilisateur
+
 // ——————— ÉNUMÉRATIONS ———————
 // Types de boutons du système
 enum ButtonType

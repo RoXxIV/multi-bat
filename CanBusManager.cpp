@@ -180,7 +180,7 @@ void sendAlarms()
     uint8_t alarms = calculateSystemAlarms();
 
     // Nombre de modules réel
-    extern int configuredBatteryCount;
+
     uint8_t moduleCount = (configuredBatteryCount > 0) ? configuredBatteryCount : 1;
 
     canFrame.data[0] = protections; // Protections calculées
@@ -252,7 +252,7 @@ void updateCanFrameDisplay()
     // Trame 0x359 - Protections/Alarmes avec calcul dynamique
     uint8_t protections = calculateSystemProtections();
     uint8_t alarms = calculateSystemAlarms();
-    extern int configuredBatteryCount;
+
     uint8_t modules = (configuredBatteryCount > 0) ? configuredBatteryCount : 1;
     sprintf(lastCanFrames[3], "359: %02X 00 %02X 00 %02X 00 00 00",
             protections, alarms, modules);
@@ -280,7 +280,6 @@ void showCanFrames()
     // Indicateurs d'état en bas
     char statusLine[30];
     extern bool degradedMode;
-    extern int configuredBatteryCount;
 
     sprintf(statusLine, "%s | %dBatt | %dA/%dA",
             degradedMode ? "DEGRADE" : "NORMAL",

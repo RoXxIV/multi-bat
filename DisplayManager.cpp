@@ -7,7 +7,6 @@
 U8G2 *display_u8g2 = nullptr;
 bool isScreenOn = true;
 extern AggregateBatteryMetrics latestMetrics;
-extern int configuredBatteryCount;
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initDisplay(U8G2 *u8g2_ptr)

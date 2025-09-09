@@ -90,7 +90,7 @@ void navigateMenuUp()
     }
     else if (currentScreen == SCREEN_BATTERY_LIST)
     {
-        extern int configuredBatteryCount; // nombre de batteries
+        // nombre de batteries
         if (configuredBatteryCount > 0)
         {
             selectedBatteryIndex = (selectedBatteryIndex - 1 + configuredBatteryCount) % configuredBatteryCount;
@@ -134,7 +134,7 @@ void navigateMenuDown()
     }
     else if (currentScreen == SCREEN_BATTERY_LIST)
     {
-        extern int configuredBatteryCount;
+
         if (configuredBatteryCount > 0)
         {
             selectedBatteryIndex = (selectedBatteryIndex + 1) % configuredBatteryCount;
@@ -197,7 +197,7 @@ void selectMenuItem()
     }
     else if (currentScreen == SCREEN_BATTERY_LIST)
     {
-        extern int configuredBatteryCount;
+
         if (configuredBatteryCount > 0)
         {
             // On stocke l'ID de la batterie sélectionnée (index + 2)
@@ -388,7 +388,7 @@ void showCanFramesScreen()
 
 void showBatteryListScreen()
 {
-    extern int configuredBatteryCount;
+
     clearDisplay();
     drawTitle("DETAILS BATTERIES");
 

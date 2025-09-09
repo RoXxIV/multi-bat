@@ -8,7 +8,6 @@ int activeBatteryCount = 0;
 int respondingBatteryCount = 0;
 bool degradedMode = false;
 bool systemInitialized = false;
-extern int configuredBatteryCount;
 // Variables globales pour les erreurs
 SystemError systemErrors[MAX_SYSTEM_ERRORS];
 int errorCount = 0;
@@ -79,8 +78,6 @@ void runBatteryManagementCycle()
 
 void printSystemStatus()
 {
-    extern int configuredBatteryCount;
-
     Serial.println("\n=== ÉTAT SYSTÈME BATTERIES ===");
     Serial.printf("Mode dégradé: %s\n", degradedMode ? "ACTIF" : "NORMAL");
     Serial.printf("Batteries actives: %d/%d\n", activeBatteryCount, configuredBatteryCount);
@@ -164,7 +161,7 @@ void printSystemStatus()
 
 void updateSystemMetrics()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     systemDiag.lastDiagnostic = millis();
@@ -245,7 +242,7 @@ void monitorBatteryConnections()
 
 int checkBatteryConnections()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     unsigned long now = millis();
@@ -363,7 +360,7 @@ void updateBatteryState(int batteryIndex, bool isResponding)
 
 bool checkMosfetStatus()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     bool mosfetIssueDetected = false;
@@ -485,7 +482,7 @@ bool checkMosfetRecoveryConditions(int batteryIndex)
 
 bool checkDegradedModeConditions()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     bool shouldActivateDegraded = false;
@@ -619,7 +616,7 @@ bool checkCanExitDegradedMode()
     bool noCriticalImbalance = true;
 
     // Vérifier l'équilibrage de toutes les batteries
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     for (int i = 0; i < configuredBatteryCount; i++)
@@ -702,7 +699,7 @@ void disableDegradedMode()
 
 void manageBatteryActivation()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     Serial.println("=== GESTION ACTIVATION BATTERIES ===");
@@ -846,7 +843,7 @@ bool checkBatteryCanBeActivated(int batteryIndex)
 
 void updateVoltageDeltas()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     // Trouver la tension la plus haute
@@ -882,7 +879,7 @@ void updateVoltageDeltas()
 
 void manageBatteryLimitations()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     Serial.println("=== GESTION LIMITATIONS INDIVIDUELLES ===");
@@ -940,7 +937,7 @@ void manageBatteryLimitations()
 
 float calculateChargeSetpoint()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     float setpoint = 0.0f;
@@ -1045,7 +1042,7 @@ float calculateChargeSetpoint()
 
 float calculateDischargeSetpoint()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     float setpoint = 0.0f;
@@ -1150,7 +1147,7 @@ float calculateDischargeSetpoint()
 
 void calculateAverages()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
     extern AggregateBatteryMetrics latestMetrics;
 
@@ -1257,7 +1254,7 @@ uint8_t calculateSystemAlarms()
 uint8_t calculateSystemProtections()
 {
     uint8_t protections = 0x00;
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     for (int i = 0; i < configuredBatteryCount; i++)
@@ -1294,7 +1291,7 @@ uint8_t calculateSystemProtections()
 
 int findHighestVoltageBattery()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     int highestIndex = -1;
@@ -1436,7 +1433,7 @@ int getActiveErrorCount()
 
 void checkWakeUpSource()
 {
-    extern int configuredBatteryCount;
+
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
     Serial.println("=== VÉRIFICATION SOURCE DE RÉVEIL (BOUTON) ===");
