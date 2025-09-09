@@ -19,9 +19,5 @@ void updateButtons(); // Met à jour l'état de tous les boutons (à appeler dan
 
 // ——————— FONCTIONS DE DÉTECTION D'APPUI ———————
 bool isButtonPressed(int buttonIndex); // Retourne vrai si le bouton est appuyé
-bool isUpPressed();                    // Retourne vrai si le bouton UP est appuyé
-bool isDownPressed();                  // Retourne vrai si le bouton DOWN est appuyé
-bool isOkPressed();                    // Retourne vrai si le bouton OK est appuyé
-bool isBackPressed();                  // Retourne vrai si le bouton BACK est appuyé
 
 #endif

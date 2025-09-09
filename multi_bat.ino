@@ -143,27 +143,24 @@ void loop()
 // gestion des boutons et des événements liés
 void handleButtonEvents()
 {
-
-  // Si un bouton est pressé
-  if (isUpPressed() || isDownPressed() || isOkPressed() || isBackPressed())
+  if (isButtonPressed(BTN_UP) || isButtonPressed(BTN_DOWN) ||
+      isButtonPressed(BTN_OK) || isButtonPressed(BTN_BACK))
   {
-    lastActivityTime = millis(); // Réinitialiser le timer d'activité
+    lastActivityTime = millis();
 
-    // Si l'écran est éteint, le premier appui ne fait que le rallumer
     if (!isScreenOn)
     {
       turnOnDisplay();
-      return; // Sortir pour ne pas traiter l'action du bouton immédiatement
+      return;
     }
 
-    // Sinon, traiter l'action du bouton normalement
-    if (isUpPressed())
+    if (isButtonPressed(BTN_UP))
       navigateMenuUp();
-    if (isDownPressed())
+    if (isButtonPressed(BTN_DOWN))
       navigateMenuDown();
-    if (isOkPressed())
+    if (isButtonPressed(BTN_OK))
       selectMenuItem();
-    if (isBackPressed())
+    if (isButtonPressed(BTN_BACK))
       goBackMenu();
   }
 }

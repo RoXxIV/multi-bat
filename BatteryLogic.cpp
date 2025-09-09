@@ -1426,11 +1426,6 @@ void removeSystemError(ErrorType type, int batteryId)
     }
 }
 
-int getActiveErrorCount()
-{
-    return errorCount;
-}
-
 void checkWakeUpSource()
 {
 

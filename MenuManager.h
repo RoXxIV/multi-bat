@@ -48,11 +48,9 @@ void goBackMenu();       // Retour vers le menu principal
 // Affichage principal
 void updateMenuDisplay(); // Met à jour l'affichage selon l'écran courant (appelée dans loop)
 // Écrans spécifiques
-void showMainDataScreen();      // Affiche l'écran principal avec données batteries temps réel
 void showMenuScreen();          // Affiche le menu principal avec navigation
 void showCodeInputScreen();     // Affiche l'écran de saisie du code admin
 void showCodeResultScreen();    // Affiche le résultat de validation du code admin
-void showCanFramesScreen();     // Affiche les trames CAN en temps réel
 void showBrightnessScreen();    // Affiche l'écran de choix de luminosité
 void showBatteryListScreen();   // Affiche la liste des batteries configurées
 void showBatteryDetailScreen(); // Affiche les détails de la batterie sélectionnée
@@ -64,10 +62,6 @@ bool isAdminMode();         // Retourne l'état du mode admin
 // Gestion du code admin
 void resetCodeInput(); // Remet à zéro la saisie du code admin
 void checkAdminCode(); // Vérifie si le code saisi est correct et gère l'activation du mode admin
-
-// ——————— ACTIONS DES MENUS ———————
-void actionShowErrors();    // Affiche les erreurs système (à implémenter)     // Configuration système avancée (mode admin uniquement)
-void actionShowCanFrames(); // Active l'affichage temps réel des trames CAN
 
 // ——————— APPAIRAGE DES BATTERIES ———————
 void actionPairing();                              // Lance le processus complet d'appairage des batteries

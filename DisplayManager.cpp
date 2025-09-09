@@ -102,21 +102,31 @@ void showMainData()
         float voltage = latestMetrics.averageVoltage;
         float current = latestMetrics.totalCurrent;
 
-        // Trouver les températures max T1 et T2
-        float totalTemp = 0.0f;
+        // Trouver les températures moyenne
+        float tempSystem = 0.0f;
         int validTempCount = 0;
+
         for (int i = 0; i < configuredBatteryCount; i++)
         {
-            if (individualBatteryMetrics[i + 1].isValid)
+            IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+            if (data->isValid)
             {
-                // On ajoute la température moyenne de cette batterie
-                totalTemp += (individualBatteryMetrics[i + 1].temp1 + individualBatteryMetrics[i + 1].temp2) / 2.0f;
+                // Moyenne de cette batterie : (min + max) / 2
+                float tempBatterie = (data->minCellTemp + data->maxCellTemp) / 2.0f;
+                tempSystem += tempBatterie;
                 validTempCount++;
             }
         }
 
-        // On calcule la moyenne générale
-        float avgBatteryTemp = (validTempCount > 0) ? (totalTemp / validTempCount) : 0.0f;
+        // Moyenne générale du système
+        if (validTempCount > 0)
+        {
+            tempSystem = tempSystem / validTempCount;
+        }
+        else
+        {
+            tempSystem = 0.0f; // Valeur par défaut si aucune donnée
+        }
 
         float chargeSetpoint = currentChargeSetpoint;
         float dischargeSetpoint = currentDischargeSetpoint;
@@ -132,7 +142,7 @@ void showMainData()
         // Ligne 2 : Courant et Température moyenne des batteries
         sprintf(line, "I:%.1fA", current);
         drawText(5, 22, line);
-        sprintf(line, "Temp:%.1fC", avgBatteryTemp);
+        sprintf(line, "Temp:%.1fC", tempSystem);
         drawText(70, 22, line);
 
         // Ligne 3 : Consignes Charge / Décharge

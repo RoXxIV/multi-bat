@@ -81,23 +81,3 @@ bool isButtonPressed(int buttonIndex)
     // Front montant : current = true ET previous = false
     return buttons[buttonIndex].currentState && !buttons[buttonIndex].previousState;
 }
-
-bool isUpPressed()
-{
-    return isButtonPressed(BTN_UP);
-}
-
-bool isDownPressed()
-{
-    return isButtonPressed(BTN_DOWN);
-}
-
-bool isOkPressed()
-{
-    return isButtonPressed(BTN_OK);
-}
-
-bool isBackPressed()
-{
-    return isButtonPressed(BTN_BACK);
-}

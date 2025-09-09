@@ -191,11 +191,6 @@ void addSystemError(ErrorType type, int batteryId, const char *description);
 void removeSystemError(ErrorType type, int batteryId);
 
 /**
- * @brief Retourne le nombre d'erreurs actives
- */
-int getActiveErrorCount();
-
-/**
  * @brief Vérifie la source de réveil des batteries (bouton physique)
  */
 void checkWakeUpSource();

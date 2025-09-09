@@ -262,7 +262,7 @@ void updateMenuDisplay()
     switch (currentScreen)
     {
     case SCREEN_MAIN_DATA:
-        showMainDataScreen();
+        showMainData();
         break;
     case SCREEN_MENU:
         showMenuScreen();
@@ -274,7 +274,8 @@ void updateMenuDisplay()
         showCodeResultScreen();
         break;
     case SCREEN_CAN_FRAMES:
-        showCanFramesScreen();
+        updateCanFrameDisplay(); // Actualiser les trames en temps réel
+        showCanFrames();         // Afficher l'écran
         break;
     case SCREEN_BRIGHTNESS:
         showBrightnessScreen();
@@ -289,11 +290,6 @@ void updateMenuDisplay()
         showErrorScreen();
         break;
     }
-}
-
-void showMainDataScreen()
-{
-    showMainData();
 }
 
 void showMenuScreen()
@@ -375,15 +371,6 @@ void showCodeResultScreen()
         if (codeSuccess)
             currentScreen = SCREEN_MENU;
     }
-}
-
-void showCanFramesScreen()
-{
-    // Actualiser les trames en temps réel
-    updateCanFrameDisplay();
-
-    // Afficher l'écran
-    showCanFrames();
 }
 
 void showBatteryListScreen()
@@ -507,7 +494,7 @@ void executeMenuAction(int idx)
         break;
     case ACTION_ERRORS:
         errorViewTop = 0;
-        actionShowErrors();
+        currentScreen = SCREEN_ERROR_LIST;
         break;
     case ACTION_INDIVIDUAL:
         selectedBatteryIndex = 0;
@@ -517,7 +504,8 @@ void executeMenuAction(int idx)
         currentScreen = SCREEN_BRIGHTNESS;
         break;
     case ACTION_CAN_FRAMES:
-        actionShowCanFrames();
+        setCanDisplayActive(true);
+        currentScreen = SCREEN_CAN_FRAMES;
         break;
     }
 }
@@ -570,20 +558,6 @@ void checkAdminCode()
     resultTimer = millis();
 }
 
-// ——————— ACTIONS MENU (STUBS) ———————
-void actionShowErrors()
-{
-    currentScreen = SCREEN_ERROR_LIST;
-    Serial.println("Action: Affichage erreurs");
-}
-
-void actionShowCanFrames()
-{
-    Serial.println("Action: Affichage trames CAN temps réel");
-    setCanDisplayActive(true);
-    currentScreen = SCREEN_CAN_FRAMES;
-}
-
 // ——————— APPAIRAGE DES BATTERIES ———————
 void actionPairing() //
 {
@@ -626,7 +600,7 @@ void waitForUserConfirmation(const char *title, const char *line1, const char *l
         updateButtons();
 
         // Vérifier si OK est pressé
-        if (isOkPressed())
+        if (isButtonPressed(BTN_OK))
         {
             waiting = false;
             Serial.println("Utilisateur a confirmé avec OK");
@@ -788,15 +762,15 @@ PairingChoice showPairingMenu(int batteriesCount)
         updateButtons();
 
         // Navigation
-        if (isUpPressed())
+        if (isButtonPressed(BTN_UP))
         {
             selectedOption = (selectedOption - 1 + 2) % 2;
         }
-        if (isDownPressed())
+        if (isButtonPressed(BTN_DOWN))
         {
             selectedOption = (selectedOption + 1) % 2;
         }
-        if (isOkPressed())
+        if (isButtonPressed(BTN_OK))
         {
             return (selectedOption == 0) ? CHOICE_ADD_BATTERY : CHOICE_FINISH;
         }
@@ -839,15 +813,15 @@ PairingChoice showErrorMenu()
     {
         updateButtons();
 
-        if (isUpPressed())
+        if (isButtonPressed(BTN_UP))
         {
             selectedOption = (selectedOption - 1 + 2) % 2;
         }
-        if (isDownPressed())
+        if (isButtonPressed(BTN_DOWN))
         {
             selectedOption = (selectedOption + 1) % 2;
         }
-        if (isOkPressed())
+        if (isButtonPressed(BTN_OK))
         {
             return (selectedOption == 0) ? CHOICE_ADD_BATTERY : CHOICE_FINISH;
         }
