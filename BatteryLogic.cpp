@@ -16,8 +16,6 @@ int errorCount = 0;
 // ——————— INITIALISATION ET SYSTÈME ———————
 void initBatteryManagement()
 {
-    Serial.println("=== INITIALISATION GESTION BATTERIES ===");
-
     // Initialisation des états des batteries
     for (int i = 0; i < MAX_BATTERIES; i++)
     {
@@ -54,16 +52,17 @@ void initBatteryManagement()
     systemInitialized = false;
 
     initErrorSystem();
-
-    Serial.println("✓ Structures de gestion batteries initialisées");
+    Serial.println("Battery Management System Initialised");
 }
 
 void runBatteryManagementCycle()
 {
-    Serial.println("\n=== CYCLE GESTION INTELLIGENTE BATTERIES ===");
+    Serial.println("\n=== Cycle principale ===");
 
     updateVoltageDeltas();      // Mise à jour des deltas de tension
     checkMosfetStatus();        // Vérification MOSFETs
+    checkWakeUpSource();        // Vérification du bouton power batterie
+    checkBmsFaults();           // Vérification des codes defauts BMS
     manageBatteryLimitations(); // Gestion des limitations individuelles
     manageBatteryActivation();  // Gestion de l'activation des batteries
     calculateAverages();        // Calcul des moyennes et agrégation
@@ -161,7 +160,6 @@ void printSystemStatus()
                       state->isActive ? "Active" : "Inactive",
                       limitText);
     }
-    Serial.println("================================\n");
 }
 
 void updateSystemMetrics()
@@ -337,7 +335,6 @@ int checkBatteryConnections()
 
     Serial.printf("RÉSULTAT: %d/%d batteries répondent\n",
                   currentRespondingCount, configuredBatteryCount);
-    Serial.println("================================");
 
     return currentRespondingCount;
 }
@@ -463,7 +460,6 @@ bool checkMosfetStatus()
         }
     }
 
-    Serial.println("================================");
     return mosfetIssueDetected;
 }
 
@@ -604,7 +600,6 @@ bool checkDegradedModeConditions()
         Serial.println("✅ Toutes les conditions sont normales");
     }
 
-    Serial.println("================================");
     return shouldActivateDegraded;
 }
 
@@ -809,7 +804,6 @@ void manageBatteryActivation()
 
     Serial.printf("RÉSULTAT: %d batteries actives sur %d configurées\n",
                   activeBatteryCount, configuredBatteryCount);
-    Serial.println("================================");
 }
 
 bool checkBatteryCanBeActivated(int batteryIndex)
@@ -940,8 +934,6 @@ void manageBatteryLimitations()
         // 4. Mode dégradé si différence température > 10°C (géré dans checkDegradedModeConditions)
         // 5. Mode dégradé si différence cellules > 250mV (géré dans checkDegradedModeConditions)
     }
-
-    Serial.println("================================");
 }
 
 // ——————— CALCUL DES CONSIGNES ———————
@@ -1058,6 +1050,20 @@ float calculateDischargeSetpoint()
 
     float setpoint = 0.0f;
     static char reason[150] = "";
+
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+        if (batteryStates[i].isResponding && data->isValid)
+        {
+            // Si le bit 1 (bouton) n'est pas actif
+            if ((data->wakeUpSource & 0x02) == 0)
+            {
+                Serial.println("SÉCURITÉ: Bouton OFF détecté. Consigne de décharge globale = 0A.");
+                return 0.0f; // On arrête tout et on renvoie 0.
+            }
+        }
+    }
 
     // On vérifie si UN SEUL MOSFET de décharge est ouvert.
     for (int i = 0; i < configuredBatteryCount; i++)
@@ -1219,8 +1225,6 @@ void calculateAverages()
         latestMetrics.isDataValid = false;
         Serial.println("ERREUR: Aucune batterie valide pour le calcul des moyennes");
     }
-
-    Serial.println("================================");
 }
 
 uint8_t calculateSystemAlarms()
@@ -1428,4 +1432,119 @@ void removeSystemError(ErrorType type, int batteryId)
 int getActiveErrorCount()
 {
     return errorCount;
+}
+
+void checkWakeUpSource()
+{
+    extern int configuredBatteryCount;
+    extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
+
+    Serial.println("=== VÉRIFICATION SOURCE DE RÉVEIL (BOUTON) ===");
+
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        int batteryId = i + 2;
+        BatteryState *state = &batteryStates[i];
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+
+        if (!state->isResponding || !data->isValid)
+            continue;
+
+        // On vérifie le bit 1 (valeur 0x02) du registre Wake-up source
+        bool isButtonOn = (data->wakeUpSource & 0x02) != 0;
+
+        if (!isButtonOn)
+        {
+            // Le bouton est sur OFF
+            Serial.printf("ERREUR: Batterie ID=%d a son bouton physique sur OFF.\n", batteryId);
+            addSystemError(ERROR_WAKEUP_BUTTON_OFF, batteryId, "Bouton physique OFF");
+        }
+        else
+        {
+            // Le bouton est sur ON, on retire l'erreur si elle existait
+            removeSystemError(ERROR_WAKEUP_BUTTON_OFF, batteryId);
+        }
+    }
+}
+
+void checkBmsFaults()
+{
+    Serial.println("=== VÉRIFICATION DÉFAUTS INTERNES BMS ===");
+
+    for (int i = 0; i < configuredBatteryCount; i++)
+    {
+        int batteryId = i + 2;
+        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+
+        if (!batteryStates[i].isResponding || !data->isValid)
+            continue;
+
+        // --- ÉTAPE 1 : On récupère toutes les valeurs de défauts ---
+        uint16_t faultCode0_1 = data->faultCode0_1;
+        uint16_t faultCode2_3 = data->faultCode2_3;
+        uint16_t faultCode4_5 = data->faultCode4_5;
+        uint16_t faultCode6_7 = data->faultCode6_7;
+        uint16_t faultCode10_11 = data->faultCode10_11;
+        uint16_t faultCode12_13 = data->faultCode12_13; // NOUVEAU
+
+        // --- ÉTAPE 2 : On analyse les bits pour chaque type de problème ---
+
+        // Problèmes de Tension Cellules (registre 0x6D)
+        if ((faultCode0_1 & 0x08) != 0)
+            addSystemError(ERROR_UNDERVOLTAGE, batteryId, "BMS: Cellule Sous-tension");
+        else
+            removeSystemError(ERROR_UNDERVOLTAGE, batteryId);
+        if ((faultCode0_1 & 0x04) != 0)
+            addSystemError(ERROR_OVERVOLTAGE, batteryId, "BMS: Cellule Surtension");
+        else
+            removeSystemError(ERROR_OVERVOLTAGE, batteryId);
+
+        // Problèmes de Température
+        bool isOverTemp = (faultCode0_1 >> 8 & 0x20) || (faultCode2_3 & 0x20) || (faultCode2_3 & 0x40) || (faultCode2_3 >> 8 & 0x40) || (faultCode6_7 >> 8 & 0x04);
+        bool isUnderTemp = (faultCode2_3 & 0x04) || (faultCode2_3 >> 8 & 0x04);
+        if (isOverTemp)
+            addSystemError(ERROR_OVERTEMPERATURE, batteryId, "BMS: Surchauffe");
+        else
+            removeSystemError(ERROR_OVERTEMPERATURE, batteryId);
+        if (isUnderTemp)
+            addSystemError(ERROR_UNDERTEMPERATURE, batteryId, "BMS: Sous-chauffe");
+        else
+            removeSystemError(ERROR_UNDERTEMPERATURE, batteryId);
+
+        // Problèmes de Courant et Sécurité (registre 0x6F)
+        if ((faultCode4_5 & 0x40) != 0)
+            addSystemError(ERROR_SHORT_CIRCUIT, batteryId, "BMS: Court-circuit");
+        else
+            removeSystemError(ERROR_SHORT_CIRCUIT, batteryId);
+        if ((faultCode4_5 >> 8 & 0x04) != 0)
+            addSystemError(ERROR_OVERCURRENT_CHARGE, batteryId, "BMS: Surintensite Charge");
+        else
+            removeSystemError(ERROR_OVERCURRENT_CHARGE, batteryId);
+        if ((faultCode4_5 >> 8 & 0x20) != 0)
+            addSystemError(ERROR_OVERCURRENT_DISCHARGE, batteryId, "BMS: Surintensite Decharge");
+        else
+            removeSystemError(ERROR_OVERCURRENT_DISCHARGE, batteryId);
+        if ((faultCode4_5 >> 8 & 0x40) != 0)
+            addSystemError(ERROR_CHARGE_PROHIBITED, batteryId, "BMS: Charge interdite (V basse)");
+        else
+            removeSystemError(ERROR_CHARGE_PROHIBITED, batteryId);
+        if ((faultCode4_5 >> 8 & 0x80) != 0)
+            addSystemError(ERROR_DISCHARGE_PROHIBITED, batteryId, "BMS: Decharge interdite (V haute)");
+        else
+            removeSystemError(ERROR_DISCHARGE_PROHIBITED, batteryId);
+
+        // Pannes matérielles (registres 0x72 et 0x73)
+        uint8_t high_byte_10_11 = faultCode10_11 >> 8;
+        uint8_t low_byte_12_13 = faultCode12_13 & 0xFF; // NOUVEAU
+
+        // Si n'importe quel bit de panne est actif, on lève l'alarme unique
+        if (high_byte_10_11 != 0 || low_byte_12_13 != 0)
+        {
+            addSystemError(ERROR_BMS_INTERNAL_FAULT, batteryId, "BMS: Batterie en panne");
+        }
+        else
+        {
+            removeSystemError(ERROR_BMS_INTERNAL_FAULT, batteryId);
+        }
+    }
 }

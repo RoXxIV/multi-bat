@@ -51,15 +51,8 @@ bool initCanBus();
 
 // ——————— ENVOI DES TRAMES CAN ———————
 /**
- * @brief Vérifie s'il est temps d'envoyer les trames CAN
- * Basé sur CAN_SEND_INTERVAL_MS (1 seconde)
- * @return true si envoi nécessaire
- */
-bool shouldSendCan();
-
-/**
  * @brief Fonction principale d'envoi CAN
- * Envoie toutes les trames vers l'onduleur toutes les secondes
+ * Envoie toutes les trames vers l'onduleur &
  * Met à jour l'affichage si actif
  */
 void sendCanData();

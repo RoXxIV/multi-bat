@@ -4,7 +4,6 @@
 
 // ——————— VARIABLES GLOBALES ———————
 CanFrame canFrame;
-unsigned long lastCanSend = 0;
 char lastCanFrames[5][50];     // Stockage texte des trames pour affichage
 bool canDisplayActive = false; // État affichage temps réel des trames
 
@@ -31,24 +30,9 @@ bool initCanBus()
     return true;
 }
 
-// ——————— CONTRÔLE DES CONSIGNES DE COURANT ———————
-
 // ——————— ENVOI DES TRAMES CAN ———————
-
-bool shouldSendCan()
-{
-    return (millis() - lastCanSend >= CAN_SEND_INTERVAL_MS);
-}
-
 void sendCanData()
 {
-    if (!shouldSendCan())
-    {
-        return;
-    }
-
-    lastCanSend = millis();
-
     // Envoyer toutes les trames
     sendChargeLimits();       // 0x351
     sendSocSoh();             // 0x355

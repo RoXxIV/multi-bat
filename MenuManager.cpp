@@ -22,6 +22,8 @@ unsigned long resultTimer = 0;
 bool codeSuccess = false;
 // Menu items
 MenuItem menuItems[MAX_MENU_ITEMS];
+int errorViewTop = 0;              // Index de la première erreur visible
+const int VISIBLE_ERROR_ITEMS = 3; // Nombre d'erreurs affichées à l'écran
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initMenu()
@@ -101,6 +103,13 @@ void navigateMenuUp()
             detailViewTop--;
         }
     }
+    else if (currentScreen == SCREEN_ERROR_LIST)
+    {
+        if (errorViewTop > 0)
+        {
+            errorViewTop--;
+        }
+    }
 }
 
 void navigateMenuDown()
@@ -140,6 +149,14 @@ void navigateMenuDown()
         if (detailViewTop < MAX_SCROLL)
         {
             detailViewTop++;
+        }
+    }
+    else if (currentScreen == SCREEN_ERROR_LIST)
+    {
+        extern int errorCount;
+        if (errorCount > VISIBLE_ERROR_ITEMS && errorViewTop < (errorCount - VISIBLE_ERROR_ITEMS))
+        {
+            errorViewTop++;
         }
     }
     // MAIN_DATA : pas de navigation up/down
@@ -489,6 +506,7 @@ void executeMenuAction(int idx)
         actionPairing();
         break;
     case ACTION_ERRORS:
+        errorViewTop = 0;
         actionShowErrors();
         break;
     case ACTION_INDIVIDUAL:
@@ -879,51 +897,71 @@ void showBrightnessScreen()
 void showErrorScreen()
 {
     extern SystemError systemErrors[MAX_SYSTEM_ERRORS];
+
     extern int errorCount;
 
     clearDisplay();
-    drawTitle("ERREURS SYSTÈME");
+
+    drawTitle("ERREURS SYSTEME");
 
     if (errorCount == 0)
+
     {
-        drawText(5, 30, "Aucune erreur active", false, false);
-        drawText(5, 45, "Système OK", false, false);
+        drawText(5, 35, "Aucune erreur active");
+
+        drawText(5, 45, "Systeme OK");
     }
     else
     {
-        char countStr[30];
-        sprintf(countStr, "%d erreur(s) active(s)", errorCount);
-        drawText(5, 20, countStr, false, false);
+        // Affiche la position dans la liste, ex: "4/5"
+        char countStr[20];
+        sprintf(countStr, "%d/%d", errorViewTop + 1, errorCount);
+        drawText(85, 12, countStr);
 
-        // Afficher les 3 premières erreurs
         int displayCount = 0;
-        for (int i = 0; i < MAX_SYSTEM_ERRORS && displayCount < 3; i++)
+        int activeErrorsFound = 0;
+
+        // On parcourt toutes les erreurs possibles
+        for (int i = 0; i < MAX_SYSTEM_ERRORS; i++)
+
         {
             if (systemErrors[i].active)
-            {
-                char errorLine[40];
-                if (systemErrors[i].batteryId >= 0)
-                {
-                    sprintf(errorLine, "ID%d: %s", systemErrors[i].batteryId, systemErrors[i].description);
-                }
-                else
-                {
-                    sprintf(errorLine, "SYS: %s", systemErrors[i].description);
-                }
 
-                drawText(5, 30 + displayCount * 10, errorLine, false, false);
-                displayCount++;
+            {
+                // On ne dessine que si l'erreur est dans notre "fenêtre" de vue
+                if (activeErrorsFound >= errorViewTop && displayCount < VISIBLE_ERROR_ITEMS)
+                {
+                    char errorLine[40];
+                    if (systemErrors[i].batteryId >= 0)
+
+                    {
+                        sprintf(errorLine, "ID%d: %s", systemErrors[i].batteryId, systemErrors[i].description);
+                    }
+                    else
+                    {
+                        sprintf(errorLine, "SYS: %s", systemErrors[i].description);
+                    }
+                    drawText(5, 30 + displayCount * 10, errorLine, false, false);
+                    displayCount++;
+                }
+                activeErrorsFound++;
             }
         }
 
-        if (errorCount > 3)
+        // --- Indicateurs de défilement ---
+        if (errorViewTop > 0)
         {
-            char moreStr[20];
-            sprintf(moreStr, "... +%d autres", errorCount - 3);
-            drawText(5, 55, moreStr, false, false);
+            drawText(120, 30, "^");
+            // Flèche vers le haut
+        }
+        if (errorViewTop < (errorCount - VISIBLE_ERROR_ITEMS))
+        {
+            drawText(120, 50, "v");
+            // Flèche vers le bas
         }
     }
 
-    drawText(5, 64, "BACK: retour", false, false);
+    drawText(5, 62, "BACK: retour");
+
     showDisplay();
 }

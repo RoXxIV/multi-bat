@@ -195,4 +195,13 @@ void removeSystemError(ErrorType type, int batteryId);
  */
 int getActiveErrorCount();
 
+/**
+ * @brief Vérifie la source de réveil des batteries (bouton physique)
+ */
+void checkWakeUpSource();
+
+/**
+ * @brief Vérifie les codes défauts internes rapportés par le BMS
+ */
+void checkBmsFaults();
 #endif

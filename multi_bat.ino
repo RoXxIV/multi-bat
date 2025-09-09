@@ -138,7 +138,6 @@ void loop()
 
   // 3. Tâches continues
   monitorBatteryConnections();
-  sendCanData();
 }
 
 // gestion des boutons et des événements liés
@@ -206,6 +205,7 @@ void handleBatteryReadSequence()
       checkDegradedModeConditions();
       runBatteryManagementCycle();
       printSystemStatus();
+      sendCanData();
 
       // On baisse le drapeau pour signaler que la séquence est finie.
       isReadingSequenceActive = false;
