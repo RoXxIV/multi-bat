@@ -4,6 +4,7 @@
 #include "Config.h"
 #include "DisplayManager.h"
 #include "ModbusManager.h"
+#include "OtaManager.h"
 
 // ——————— ENUMERATIONS ———————
 // Choix disponibles après configuration d'une batterie
@@ -81,4 +82,8 @@ void executeMenuAction(int itemIndex); // Exécute l'action associée à un item
  * @brief Affiche l'écran des erreurs système
  */
 void showErrorScreen();
+
+// ——————— Mise a jour OTA ———————
+void actionOTAUpdate(); // Lance le processus OTA
+void showOTAScreen();   // Affiche l'écran OTA
 #endif

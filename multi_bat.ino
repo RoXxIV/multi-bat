@@ -16,6 +16,7 @@
 #include "CanBusManager.h"
 #include "NvsManager.h"
 #include "BatteryLogic.h"
+#include "OtaManager.h"
 
 // ——————— Objets materiels ———————
 HardwareSerial modbusSerial(2);                                                           // Port serie pour la communication Modbus
@@ -64,6 +65,7 @@ void setup()
   initMenu();                  // Initialisation du système de menus
   initBatteryManagement();     // Initialisation de la gestion des batteries
   initStatusLeds();            // Initialisation des LEDs de statut
+  initOTA();                   // Initialisation du serveur OTA
   Serial.println("✓ Système de gestion batteries initialisé");
 
   /*
@@ -106,6 +108,7 @@ void loop()
   unsigned long now = millis();
   updateButtons();      // Mise à jour de l'état de tous les boutons (anti-rebond inclus)
   handleButtonEvents(); // Traitement des événements boutons
+  handleOTAProcess();   // Traitement du processus OTA
 
   // Vérifier l'inactivité pour éteindre l'écran et Mise à jour de l'affichage à intervalles réguliers
   if (isScreenOn && (millis() - lastActivityTime > SCREEN_TIMEOUT_MS))

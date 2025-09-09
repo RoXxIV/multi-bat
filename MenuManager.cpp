@@ -49,6 +49,7 @@ void buildMenu()
     {
         menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, true};
         menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, true};
+        menuItems[totalMenuItems++] = {"Mettre a jour (OTA)", ACTION_OTA_UPDATE, true};
     }
 
     // Garde-fou
@@ -207,6 +208,22 @@ void selectMenuItem()
             detailViewTop = 0;
         }
     }
+    else if (currentScreen == SCREEN_OTA)
+    {
+        // Démarrer le serveur si OK est pressé et que le serveur n'est pas déjà actif
+        if (!otaServerActive)
+        {
+            if (startOTAServer())
+            {
+                Serial.println("Serveur OTA Arduino démarré avec succès");
+            }
+            else
+            {
+                showMessage("ERREUR", "Echec WiFi");
+                delay(2000);
+            }
+        }
+    }
 }
 
 void goBackMenu()
@@ -253,6 +270,11 @@ void goBackMenu()
         currentScreen = SCREEN_MENU;
         Serial.println("Retour du menu erreurs vers menu principal");
         break;
+    case SCREEN_OTA:
+        stopOTAServer();
+        currentScreen = SCREEN_MENU;
+        Serial.println("Retour du menu OTA vers menu principal");
+        break;
     }
 }
 
@@ -288,6 +310,9 @@ void updateMenuDisplay()
         break;
     case SCREEN_ERROR_LIST:
         showErrorScreen();
+        break;
+    case SCREEN_OTA:
+        showOTAScreen();
         break;
     }
 }
@@ -424,7 +449,7 @@ void showBatteryDetailScreen()
 
         sprintf(lines[0], "V: %.2fV  I: %.2fA", data->voltage, data->current);
         sprintf(lines[1], "SOC: %.1f%%", data->soc);
-        sprintf(lines[2], "T1: %.1fC  T2: %.1fC", data->temp1, data->temp2);
+        sprintf(lines[2], "Temp: %.1f/%.1fC", data->minCellTemp, data->maxCellTemp);
         sprintf(lines[3], "Diff cells: %.3fV", data->cellVoltageDifference);
         sprintf(lines[4], "Limite Courant: %.1fA", data->currentLimit);
         sprintf(lines[5], "S/N: %.14s", data->serialNumber);
@@ -506,6 +531,9 @@ void executeMenuAction(int idx)
     case ACTION_CAN_FRAMES:
         setCanDisplayActive(true);
         currentScreen = SCREEN_CAN_FRAMES;
+        break;
+    case ACTION_OTA_UPDATE:
+        actionOTAUpdate();
         break;
     }
 }
@@ -936,6 +964,83 @@ void showErrorScreen()
     }
 
     drawText(5, 62, "BACK: retour");
+
+    showDisplay();
+}
+
+void actionOTAUpdate()
+{
+    Serial.println("Action: Mise à jour OTA");
+    currentScreen = SCREEN_OTA;
+}
+
+void showOTAScreen()
+{
+    clearDisplay();
+    drawTitle("MISE A JOUR OTA");
+
+    if (otaInProgress)
+    {
+        // Mise à jour en cours - affichage géré par les callbacks
+        // Cette partie sera gérée automatiquement par ArduinoOTA
+        return;
+    }
+    else if (!otaServerActive)
+    {
+        drawText(5, 22, "Serveur OTA eteint");
+        drawText(5, 32, "Appuyez OK pour");
+        drawText(5, 42, "demarrer");
+
+        // Instructions
+        drawText(5, 60, "OK:start  BACK:retour");
+    }
+    else
+    {
+        // Serveur actif - afficher les infos
+        drawText(5, 22, "Serveur OTA actif");
+
+        // Afficher les informations de connexion
+        String otaInfo = getOTAInfo();
+
+        // Parser et afficher les infos sur plusieurs lignes
+        int lineY = 32;
+        int startPos = 0;
+        int newlinePos = 0;
+
+        while ((newlinePos = otaInfo.indexOf('\n', startPos)) != -1)
+        {
+            String line = otaInfo.substring(startPos, newlinePos);
+            if (line.length() > 20)
+            {
+                // Ligne trop longue, la couper
+                drawText(5, lineY, line.substring(0, 20).c_str());
+                lineY += 7;
+                if (line.length() > 20)
+                {
+                    drawText(5, lineY, line.substring(20).c_str());
+                    lineY += 7;
+                }
+            }
+            else
+            {
+                drawText(5, lineY, line.c_str());
+                lineY += 7;
+            }
+            startPos = newlinePos + 1;
+
+            if (lineY > 50)
+                break; // Éviter de déborder
+        }
+
+        // Dernière ligne (après le dernier \n)
+        if (startPos < otaInfo.length() && lineY <= 50)
+        {
+            String lastLine = otaInfo.substring(startPos);
+            drawText(5, lineY, lastLine.c_str());
+        }
+
+        drawText(5, 62, "BACK:arreter");
+    }
 
     showDisplay();
 }

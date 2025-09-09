@@ -97,7 +97,8 @@ enum ScreenType
     SCREEN_BRIGHTNESS = 5,     // Écran de réglage de luminosité
     SCREEN_BATTERY_LIST = 6,   // Nouvel écran: liste des batteries
     SCREEN_BATTERY_DETAIL = 7, // Nouvel écran: détails d'une batterie
-    SCREEN_ERROR_LIST = 8      // Écran des erreurs système
+    SCREEN_ERROR_LIST = 8,     // Écran des erreurs système
+    SCREEN_OTA = 9,            // mise à jour OTA
 };
 // Actions disponibles dans les menus
 enum MenuActions
@@ -109,7 +110,8 @@ enum MenuActions
     ACTION_PAIRING = 5,         // Processus d'appairage batteries
     ACTION_SYSTEM_SETTINGS = 6, // Paramètres système (admin)
     ACTION_CAN_FRAMES = 7,      // Affichage trames CAN temps réel
-    ACTION_BRIGHTNESS = 8       // Action pour régler la luminosité
+    ACTION_BRIGHTNESS = 8,      // Action pour régler la luminosité
+    ACTION_OTA_UPDATE = 9       // Mise à jour OTA
 };
 
 enum LimitationType
