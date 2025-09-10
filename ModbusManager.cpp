@@ -22,6 +22,23 @@ void initModbus()
     Serial.println("Modbus initialisé via ModbusLib - Baud: 9600 8N1");
 }
 
+void startModbus()
+{
+    if (!modbusSerial)
+    {
+        modbusSerial.begin(BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
+        Serial.println("Modbus redémarré");
+    }
+}
+
+void stopModbus()
+{
+    if (modbusSerial)
+    {
+        modbusSerial.end();
+        Serial.println("Modbus arrêté");
+    }
+}
 // ——————— FONCTIONS DE LECTURE ———————
 
 void updateIndividualBatteryMetrics(uint8_t batteryId)

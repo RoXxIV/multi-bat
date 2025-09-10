@@ -194,12 +194,11 @@ void updateSystemMetrics()
             if (data->voltage < systemDiag.minBatteryVoltage)
                 systemDiag.minBatteryVoltage = data->voltage;
 
-            // Mise à jour min/max températures (on prend la plus haute des deux sondes)
-            float maxTemp = max(data->temp1, data->temp2);
-            if (maxTemp > systemDiag.maxBatteryTemp)
-                systemDiag.maxBatteryTemp = maxTemp;
-            if (maxTemp < systemDiag.minBatteryTemp)
-                systemDiag.minBatteryTemp = maxTemp;
+            // Mise à jour min/max températures
+            if (data->maxCellTemp > systemDiag.maxBatteryTemp)
+                systemDiag.maxBatteryTemp = data->maxCellTemp;
+            if (data->minCellTemp < systemDiag.minBatteryTemp)
+                systemDiag.minBatteryTemp = data->minCellTemp;
         }
 
         // Comptage des batteries actives (pour l'instant toutes les répondantes sont actives)

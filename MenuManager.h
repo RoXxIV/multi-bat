@@ -55,7 +55,7 @@ void showCodeResultScreen();    // Affiche le résultat de validation du code ad
 void showBrightnessScreen();    // Affiche l'écran de choix de luminosité
 void showBatteryListScreen();   // Affiche la liste des batteries configurées
 void showBatteryDetailScreen(); // Affiche les détails de la batterie sélectionnée
-
+void showDiagnosticScreen();    // Affiche l'écran de diagnostic
 // ——————— GESTION MODE ADMIN ———————
 void activateAdminMode();   // Active le mode admin (ajoute items avancés au menu)
 void deactivateAdminMode(); // Désactive le mode admin (retour mode utilisateur)

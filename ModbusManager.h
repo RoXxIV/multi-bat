@@ -55,6 +55,8 @@ extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
 // --- FONCTIONS D'INITIALISATION ---
 void initModbus();
+void startModbus();
+void stopModbus();
 
 // --- FONCTION DE LECTURE PRINCIPALE ---
 void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatteryMetrics *metrics);

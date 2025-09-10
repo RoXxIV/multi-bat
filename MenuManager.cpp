@@ -50,6 +50,7 @@ void buildMenu()
         menuItems[totalMenuItems++] = {"Effectuer appairage", ACTION_PAIRING, true};
         menuItems[totalMenuItems++] = {"Batteries individuelles", ACTION_INDIVIDUAL, true};
         menuItems[totalMenuItems++] = {"Mettre a jour (OTA)", ACTION_OTA_UPDATE, true};
+        menuItems[totalMenuItems++] = {"Mode diagnostique", ACTION_DIAGNOSTIC, true};
     }
 
     // Garde-fou
@@ -275,6 +276,11 @@ void goBackMenu()
         currentScreen = SCREEN_MENU;
         Serial.println("Retour du menu OTA vers menu principal");
         break;
+    case SCREEN_DIAGNOSTIC: // <- AJOUTER CE CAS
+        startModbus();
+        currentScreen = SCREEN_MENU;
+        Serial.println("Retour du mode diagnostique vers menu principal");
+        break;
     }
 }
 
@@ -313,6 +319,9 @@ void updateMenuDisplay()
         break;
     case SCREEN_OTA:
         showOTAScreen();
+        break;
+    case SCREEN_DIAGNOSTIC:
+        showDiagnosticScreen();
         break;
     }
 }
@@ -481,6 +490,15 @@ void showBatteryDetailScreen()
     showDisplay();
 }
 
+void showDiagnosticScreen()
+{
+    clearDisplay();
+    drawTitle("MODE DIAGNOSTIQUE");
+    drawText(5, 35, "Le bus Modbus est");
+    drawText(5, 45, "maintenant en pause.");
+    drawText(5, 62, "BACK: reprendre");
+    showDisplay();
+}
 // ——————— FONCTIONS UTILITAIRES ———————
 
 void adjustMenuView()
@@ -534,6 +552,10 @@ void executeMenuAction(int idx)
         break;
     case ACTION_OTA_UPDATE:
         actionOTAUpdate();
+        break;
+    case ACTION_DIAGNOSTIC:
+        stopModbus();
+        currentScreen = SCREEN_DIAGNOSTIC;
         break;
     }
 }
