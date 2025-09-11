@@ -124,12 +124,9 @@ void sendVoltageCurrentTemp()
     canFrame.extd = 0;
     canFrame.data_length_code = 8;
 
-    // Tension: 42.00V = 4200 = 0x1068
-    // Courant: 0.0A = 0 = 0x0000
-    // Température: 27.0°C = 270 = 0x010E
-    uint16_t voltage = 4200;  // 42.00V en 0.01V
-    uint16_t current = 30000; // 0.0A
-    uint16_t temp = 270;      // 27.0°C en 0.1°C
+    uint16_t voltage = 4200; // 42.00V en 0.01V
+    uint16_t current = 0;    // Valeur par défaut 0A, sans offset
+    uint16_t temp = 270;     // 27.0°C en 0.1°C
 
     extern AggregateBatteryMetrics latestMetrics;
 
@@ -138,10 +135,10 @@ void sendVoltageCurrentTemp()
         // Tension: Conversion V vers 0.01V (ex: 48.5V → 4850)
         voltage = (uint16_t)(latestMetrics.averageVoltage * 100);
 
-        // Courant: Conversion A vers 0.01A avec offset 30000
-        // Positif = charge, Négatif = décharge
-        int32_t currentRaw = (int32_t)(latestMetrics.totalCurrent * 10);
-        current = (uint16_t)(currentRaw + 30000);
+        // Courant: Conversion A vers 0.01A SANS OFFSET.
+        // La valeur est un entier signé sur 16 bits (négatif = décharge).
+        int16_t signed_current = (int16_t)(latestMetrics.totalCurrent * 100);
+        current = (uint16_t)signed_current; // Cast en non-signé pour l'envoi
 
         // Température: Conversion °C vers 0.1°C (ex: 35.2°C → 352)
         temp = (uint16_t)(latestMetrics.averageTemp * 10);
@@ -164,8 +161,8 @@ void sendVoltageCurrentTemp()
     canFrame.data[7] = 0x00;              // Fixe
 
     ESP32Can.writeFrame(canFrame);
-    Serial.printf("CAN 0x356: V=%.2fV, I=%.1fA, T=%.1f°C (données %s)\n",
-                  voltage / 100.0, (current - 30000) / 100.0, temp / 10.0,
+    Serial.printf("CAN 0x356: V=%.2fV, I=%.2fA, T=%.1f°C (données %s)\n",
+                  voltage / 100.0, ((int16_t)current) / 100.0, temp / 10.0,
                   latestMetrics.isDataValid ? "valides" : "défaut");
 }
 
@@ -241,8 +238,8 @@ void updateCanFrameDisplay()
 
     // Trame 0x356 - Tension/Courant/Température avec données réelles
     uint16_t volt_display = latestMetrics.isDataValid ? (uint16_t)(latestMetrics.averageVoltage * 100) : 4200;
-    int16_t curr_raw = latestMetrics.isDataValid ? (int16_t)(latestMetrics.totalCurrent * 100) : 0;
-    uint16_t curr_display = (uint16_t)(curr_raw + 30000);
+    int16_t signed_curr_display = latestMetrics.isDataValid ? (int16_t)(latestMetrics.totalCurrent * 100) : 0;
+    uint16_t curr_display = (uint16_t)signed_curr_display;
     uint16_t temp_display = latestMetrics.isDataValid ? (uint16_t)(latestMetrics.averageTemp * 10) : 270;
     sprintf(lastCanFrames[2], "356: %02X %02X %02X %02X %02X %02X 00 00",
             lowByte(volt_display), highByte(volt_display),

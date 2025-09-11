@@ -103,30 +103,7 @@ void showMainData()
         float current = latestMetrics.totalCurrent;
 
         // Trouver les températures moyenne
-        float tempSystem = 0.0f;
-        int validTempCount = 0;
-
-        for (int i = 0; i < configuredBatteryCount; i++)
-        {
-            IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
-            if (data->isValid)
-            {
-                // Moyenne de cette batterie : (min + max) / 2
-                float tempBatterie = (data->minCellTemp + data->maxCellTemp) / 2.0f;
-                tempSystem += tempBatterie;
-                validTempCount++;
-            }
-        }
-
-        // Moyenne générale du système
-        if (validTempCount > 0)
-        {
-            tempSystem = tempSystem / validTempCount;
-        }
-        else
-        {
-            tempSystem = 0.0f; // Valeur par défaut si aucune donnée
-        }
+        float tempSystem = latestMetrics.averageTemp;
 
         float chargeSetpoint = currentChargeSetpoint;
         float dischargeSetpoint = currentDischargeSetpoint;

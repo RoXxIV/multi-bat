@@ -95,7 +95,7 @@ int modbus_read_registers(uint8_t slave_id, uint16_t start_addr, uint16_t reg_co
     modbus_enable_receive();
 
     // 3. Attendre et recevoir la réponse
-    unsigned long timeout = millis() + 400; // Timeout de 400ms
+    unsigned long timeout = millis() + 750; // Timeout augmenté à 750ms -vvv
     int responseLength = 0;
     while (millis() < timeout && responseLength < sizeof(response))
     {
@@ -155,7 +155,7 @@ bool modbus_write_register(uint8_t slave_id, uint16_t reg_addr, uint16_t value)
 
     // 3. Attendre l'ACK (logique inspirée de waitForAck)
     uint8_t response[32];
-    unsigned long timeout = millis() + 400;
+    unsigned long timeout = millis() + 750; // Timeout augmenté -vvv
     int n = 0;
     while (millis() < timeout && n < sizeof(response))
     {
@@ -221,7 +221,7 @@ bool modbus_write_multiple_registers(uint8_t slave_id, uint16_t start_addr, uint
 
     // 3. Attendre et valider l'ACK (inchangé)
     uint8_t response[32];
-    unsigned long timeout = millis() + 400;
+    unsigned long timeout = millis() + 750; // Timeout augmenté -vvv
     int n = 0;
     while (millis() < timeout && n < sizeof(response))
     {

@@ -1,11 +1,3 @@
-/*
- * PROJET MULTIBATTERIE - Carte de gestion batteries lithium
- *
- * Permet de connecter jusqu'à 9 batteries individuelles à un onduleur
- * via communication Modbus (batteries) et CAN Bus (onduleur)
- *
- * Hardware: ESP32 + écran OLED + 4 boutons + interface RS485
- */
 #include <Wire.h>
 #include <U8g2lib.h>
 #include "Config.h"
@@ -98,7 +90,7 @@ void setup()
 
   // Message de démarrage
   Serial.println("Système prêt !");
-  showMessage("BIENVENUE", "Démarrage");
+  showMessage("BIENVENUE", "Demarrage");
   delay(1500);
 }
 
@@ -187,8 +179,20 @@ void handleBatteryReadSequence()
     uint8_t currentBatteryId = batteryReadIndex + 2;
     updateIndividualBatteryMetrics(currentBatteryId);
 
+    // --- Vérifier l'etat de la batterie ---
     bool responding = individualBatteryMetrics[batteryReadIndex + 1].isValid;
-    updateBatteryState(batteryReadIndex, responding);
+    BatteryState *state = &batteryStates[batteryReadIndex]; // Pointeur vers l'état de la batterie actuelle
+    if (responding)
+    {
+      state->isResponding = true;
+      state->lastResponseTime = millis();
+      state->status = BATTERY_OK; // Sera affiné plus tard par les autres vérifications
+    }
+    else
+    {
+      state->isResponding = false;
+      state->status = BATTERY_NOT_RESPONDING;
+    }
 
     printIndividualBatteryData(currentBatteryId); // Pour le debug
 
@@ -210,7 +214,7 @@ void handleBatteryReadSequence()
       // On baisse le drapeau pour signaler que la séquence est finie.
       isReadingSequenceActive = false;
     }
-    // NON : La fonction se termine, et on attendra 250ms pour lire la suivante.
+    // La fonction se termine, et on attendra 250ms pour lire la suivante.
   }
 }
 // ==========================================================================

@@ -453,17 +453,16 @@ void showBatteryDetailScreen()
     else
     {
         // On prépare toutes nos lignes de données dans un tableau
-        const int TOTAL_LINES = 8;
+        const int TOTAL_LINES = 7;
         static char lines[TOTAL_LINES][32];
 
         sprintf(lines[0], "V: %.2fV  I: %.2fA", data->voltage, data->current);
         sprintf(lines[1], "SOC: %.1f%%", data->soc);
         sprintf(lines[2], "Temp: %.1f/%.1fC", data->minCellTemp, data->maxCellTemp);
         sprintf(lines[3], "Diff cells: %.3fV", data->cellVoltageDifference);
-        sprintf(lines[4], "Limite Courant: %.1fA", data->currentLimit);
-        sprintf(lines[5], "S/N: %.14s", data->serialNumber);
-        sprintf(lines[6], "     %.14s", data->serialNumber + 14);
-        sprintf(lines[7], "MOSFET Ch:%s Dch:%s", data->chargeMosfetStatus ? "ON" : "OFF", data->dischargeMosfetStatus ? "ON" : "OFF");
+        sprintf(lines[4], "S/N: %.14s", data->serialNumber);
+        sprintf(lines[5], "     %.14s", data->serialNumber + 14);
+        sprintf(lines[6], "MOSFET Ch:%s Dch:%s", data->chargeMosfetStatus ? "ON" : "OFF", data->dischargeMosfetStatus ? "ON" : "OFF");
 
         // On affiche seulement la "fenêtre" visible (4 lignes)
         const int VISIBLE_LINES = 4;

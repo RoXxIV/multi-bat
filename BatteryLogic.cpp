@@ -7,7 +7,6 @@ float currentDischargeSetpoint = 0.0f;
 int activeBatteryCount = 0;
 int respondingBatteryCount = 0;
 bool degradedMode = false;
-bool systemInitialized = false;
 // Variables globales pour les erreurs
 SystemError systemErrors[MAX_SYSTEM_ERRORS];
 int errorCount = 0;
@@ -48,7 +47,6 @@ void initBatteryManagement()
 
     // Flags
     degradedMode = false;
-    systemInitialized = false;
 
     initErrorSystem();
     Serial.println("Battery Management System Initialised");
@@ -161,17 +159,13 @@ void printSystemStatus()
 
 void updateSystemMetrics()
 {
-
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
-
     systemDiag.lastDiagnostic = millis();
-
     // Reset des valeurs min/max
     systemDiag.maxBatteryVoltage = 0.0f;
     systemDiag.minBatteryVoltage = 999.0f;
     systemDiag.maxBatteryTemp = -100.0f;
     systemDiag.minBatteryTemp = 999.0f;
-
     // Compteurs
     activeBatteryCount = 0;
     respondingBatteryCount = 0;
@@ -179,7 +173,7 @@ void updateSystemMetrics()
     // Parcours des batteries configurées
     for (int i = 0; i < configuredBatteryCount; i++)
     {
-        int batteryId = i + 2; // ID commence à 2
+        int batteryId = i + 2; // ID commence tooujours à 2
         BatteryState *state = &batteryStates[i];
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1]; // Index dans le tableau global
 
@@ -335,26 +329,6 @@ int checkBatteryConnections()
     return currentRespondingCount;
 }
 
-void updateBatteryState(int batteryIndex, bool isResponding)
-{
-    if (batteryIndex < 0 || batteryIndex >= MAX_BATTERIES)
-        return;
-
-    BatteryState *state = &batteryStates[batteryIndex];
-
-    if (isResponding)
-    {
-        state->isResponding = true;
-        state->lastResponseTime = millis();
-        state->status = BATTERY_OK; // On affinera plus tard avec les autres vérifications
-    }
-    else
-    {
-        state->isResponding = false;
-        state->status = BATTERY_NOT_RESPONDING;
-    }
-}
-
 // ——————— DIAGNOSTIC ET DÉTECTION DES PANNES ———————
 
 bool checkMosfetStatus()
@@ -473,8 +447,8 @@ bool checkMosfetRecoveryConditions(int batteryIndex)
 
     bool mosOk = data->chargeMosfetStatus && data->dischargeMosfetStatus;
     bool voltageOk = state->voltageDelta < VOLTAGE_TOLERANCE;
-    bool tempOk = (data->temp1 < MAX_MOS_TEMP) && (data->temp2 < MAX_MOS_TEMP) &&
-                  (data->mosTemp < MAX_MOS_TEMP);
+    float avgCellTemp = (data->maxCellTemp + data->minCellTemp) / 2.0f;
+    bool tempOk = avgCellTemp < MAX_MOS_TEMP;
 
     return mosOk && voltageOk && tempOk;
 }
@@ -586,7 +560,26 @@ bool checkDegradedModeConditions()
     else if (!shouldActivateDegraded && degradedMode)
     {
         // Vérifier si on peut sortir du mode dégradé
-        if (checkCanExitDegradedMode())
+        bool allBatteriesRespond = (respondingBatteryCount == configuredBatteryCount);
+        bool tempOk = (systemDiag.maxBatteryTemp <= MAX_DISCHARGE_TEMP);
+        bool tempDeltaOk = (systemDiag.maxBatteryTemp - systemDiag.minBatteryTemp <= TEMP_DIFF_THRESHOLD);
+        bool noCriticalImbalance = true;
+
+        extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
+        for (int i = 0; i < configuredBatteryCount; i++)
+        {
+            IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
+            if (batteryStates[i].isResponding && data->isValid)
+            {
+                if (data->cellVoltageDifference > CELL_DIFF_THRESHOLD)
+                {
+                    noCriticalImbalance = false;
+                    break;
+                }
+            }
+        }
+
+        if (allBatteriesRespond && tempOk && tempDeltaOk && noCriticalImbalance)
         {
             disableDegradedMode();
         }
@@ -597,52 +590,6 @@ bool checkDegradedModeConditions()
     }
 
     return shouldActivateDegraded;
-}
-
-bool checkCanExitDegradedMode()
-{
-    /*
-    Pour sortir du mode dégradé, toutes les conditions de sécurité
-    doivent être revenues à la normale pour garantir un fonctionnement optimal.
-    1. Toutes les batteries configurées répondent
-    2. Pas de surtempérature
-    3. Pas de déséquilibrage critique
-    4. Delta température acceptable
-    */
-    bool allBatteriesRespond = (respondingBatteryCount == configuredBatteryCount);
-    bool tempOk = (systemDiag.maxBatteryTemp <= MAX_DISCHARGE_TEMP);
-    bool tempDeltaOk = (systemDiag.maxBatteryTemp - systemDiag.minBatteryTemp <= TEMP_DIFF_THRESHOLD);
-    bool noCriticalImbalance = true;
-
-    // Vérifier l'équilibrage de toutes les batteries
-
-    extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
-
-    for (int i = 0; i < configuredBatteryCount; i++)
-    {
-        IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
-        if (batteryStates[i].isResponding && data->isValid)
-        {
-            if (data->cellVoltageDifference > CELL_DIFF_THRESHOLD)
-            {
-                noCriticalImbalance = false;
-                break;
-            }
-        }
-    }
-
-    bool canExit = allBatteriesRespond && tempOk && tempDeltaOk && noCriticalImbalance;
-
-    if (!canExit)
-    {
-        Serial.printf("⏳ Mode dégradé maintenu: Batt:%s Temp:%s DeltaT:%s Equil:%s\n",
-                      allBatteriesRespond ? "OK" : "KO",
-                      tempOk ? "OK" : "KO",
-                      tempDeltaOk ? "OK" : "KO",
-                      noCriticalImbalance ? "OK" : "KO");
-    }
-
-    return canExit;
 }
 
 // ——————— GESTION MODE DÉGRADÉ ———————
@@ -782,12 +729,17 @@ void manageBatteryActivation()
     if (highestBatteryIndex >= 0 &&
         batteryStates[highestBatteryIndex].isResponding)
     {
+        // On vérifie si elle n'était pas déjà comptée comme active
+        bool alreadyActive = batteryStates[highestBatteryIndex].isActive;
+
+        // On force son statut à actif dans tous les cas
         batteryStates[highestBatteryIndex].isActive = true;
         batteryStates[highestBatteryIndex].activeLimitation = NO_LIMITATION;
 
-        if (batteryStates[highestBatteryIndex].voltageDelta == 0)
+        // On n'incrémente le compteur que si elle vient d'être activée par ce bloc
+        if (!alreadyActive)
         {
-            newActiveBatteryCount++; // Pas déjà comptée
+            newActiveBatteryCount++;
         }
 
         Serial.printf("  ID=%d: ACTIVE (tension max - forcée)\n",
@@ -820,9 +772,9 @@ bool checkBatteryCanBeActivated(int batteryIndex)
     bool balanceOk = (state->status != BATTERY_CELL_IMBALANCE);
     bool voltageOk = (state->status != BATTERY_VOLTAGE_ISSUE);
 
-    // Vérification température en temps réel
-    float maxTemp = max(data->temp1, data->temp2);
-    bool realtimeTempOk = (maxTemp >= MIN_DISCHARGE_TEMP && maxTemp <= MAX_DISCHARGE_TEMP);
+    // Vérification température en temps réel avec température moyenne des cellules
+    float avgCellTemp = (data->maxCellTemp + data->minCellTemp) / 2.0f;
+    bool realtimeTempOk = (avgCellTemp >= MIN_DISCHARGE_TEMP && avgCellTemp <= MAX_DISCHARGE_TEMP);
 
     bool canActivate = mosfetOk && tempOk && balanceOk && voltageOk && realtimeTempOk;
 
@@ -1052,8 +1004,8 @@ float calculateDischargeSetpoint()
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
         if (batteryStates[i].isResponding && data->isValid)
         {
-            // Si le bit 1 (bouton) n'est pas actif
-            if ((data->wakeUpSource & 0x02) == 0)
+            // Si le bit 0 (key) n'est pas actif
+            if ((data->wakeUpSource & 0x01) == 0)
             {
                 Serial.println("SÉCURITÉ: Bouton OFF détecté. Consigne de décharge globale = 0A.");
                 return 0.0f; // On arrête tout et on renvoie 0.
@@ -1157,9 +1109,7 @@ void calculateAverages()
     float totalSoh = 100.0f; // SOH par défaut (pas de registre dédié dans vos BMS)
     float totalVoltage = 0.0f;
     float totalCurrent = 0.0f;
-    float totalTemp1 = 0.0f;
-    float totalTemp2 = 0.0f;
-    float totalMosTemp = 0.0f;
+    float totalTempSystem = 0.0f;
     int validBatteries = 0;
 
     // Parcourir les batteries actives et répondantes
@@ -1182,13 +1132,12 @@ void calculateAverages()
         totalSoc += data->soc;
         totalVoltage += data->voltage;
         totalCurrent += data->current; // Cumul des courants (selon vos consignes)
-        totalTemp1 += data->temp1;
-        totalTemp2 += data->temp2;
-        totalMosTemp += data->mosTemp;
+        float tempBatterie = (data->minCellTemp + data->maxCellTemp) / 2.0f;
+        totalTempSystem += tempBatterie;
 
-        Serial.printf("  ID=%d: SOC=%.1f%% V=%.2fV I=%.1fA T1=%.1f°C T2=%.1f°C\n",
+        Serial.printf("  ID=%d: SOC=%.1f%% V=%.2fV I=%.1fA TempBat=%.1f°C\n",
                       batteryId, data->soc, data->voltage, data->current,
-                      data->temp1, data->temp2);
+                      tempBatterie);
     }
 
     // Calculer les moyennes et mettre à jour latestMetrics
@@ -1198,13 +1147,7 @@ void calculateAverages()
         latestMetrics.averageVoltage = totalVoltage / validBatteries;
         latestMetrics.totalCurrent = totalCurrent; // Cumul, pas moyenne
 
-        // Température moyenne des batteries (moyenne des sondes T1 et T2)
-        float avgTemp1 = totalTemp1 / validBatteries;
-        float avgTemp2 = totalTemp2 / validBatteries;
-        latestMetrics.averageTemp = (avgTemp1 + avgTemp2) / 2.0f;
-
-        // Température moyenne des MOSFETs
-        float avgMosTemp = totalMosTemp / validBatteries;
+        latestMetrics.averageTemp = totalTempSystem / validBatteries;
 
         latestMetrics.isDataValid = true;
 
@@ -1213,8 +1156,7 @@ void calculateAverages()
         Serial.printf("  SOC moyen: %.1f%%\n", latestMetrics.averageSoc);
         Serial.printf("  Tension moyenne: %.2fV\n", latestMetrics.averageVoltage);
         Serial.printf("  Courant total: %.1fA\n", latestMetrics.totalCurrent);
-        Serial.printf("  Température moyenne: %.1f°C\n", latestMetrics.averageTemp);
-        Serial.printf("  Température MOS moyenne: %.1f°C\n", avgMosTemp);
+        Serial.printf("  Température système: %.1f°C\n", latestMetrics.averageTemp);
     }
     else
     {
@@ -1430,7 +1372,7 @@ void checkWakeUpSource()
 
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
 
-    Serial.println("=== VÉRIFICATION SOURCE DE RÉVEIL (BOUTON) ===");
+    Serial.println("=== VÉRIFICATION SOURCE DE RÉVEIL (KEY) ===");
 
     for (int i = 0; i < configuredBatteryCount; i++)
     {
@@ -1441,18 +1383,18 @@ void checkWakeUpSource()
         if (!state->isResponding || !data->isValid)
             continue;
 
-        // On vérifie le bit 1 (valeur 0x02) du registre Wake-up source
-        bool isButtonOn = (data->wakeUpSource & 0x02) != 0;
+        // On vérifie le bit 0 (valeur 0x01, "key") du registre Wake-up source
+        bool isKeyOn = (data->wakeUpSource & 0x01) != 0;
 
-        if (!isButtonOn)
+        if (!isKeyOn) // <-- CORRIGÉ ICI
         {
-            // Le bouton est sur OFF
-            Serial.printf("ERREUR: Batterie ID=%d a son bouton physique sur OFF.\n", batteryId);
-            addSystemError(ERROR_WAKEUP_BUTTON_OFF, batteryId, "Bouton physique OFF");
+            // La clé est sur OFF
+            Serial.printf("ERREUR: Batterie ID=%d a sa clé (key) sur OFF.\n", batteryId);
+            addSystemError(ERROR_WAKEUP_BUTTON_OFF, batteryId, "Cle (key) OFF");
         }
         else
         {
-            // Le bouton est sur ON, on retire l'erreur si elle existait
+            // La clé est sur ON, on retire l'erreur si elle existait
             removeSystemError(ERROR_WAKEUP_BUTTON_OFF, batteryId);
         }
     }

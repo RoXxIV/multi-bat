@@ -23,10 +23,6 @@ struct IndividualBatteryData
 
     bool chargeMosfetStatus;
     bool dischargeMosfetStatus;
-    float mosTemp;
-    float currentLimit;
-    float temp1;
-    float temp2;
 
     uint16_t wakeUpSource;
     uint16_t faultCode0_1;
@@ -59,7 +55,6 @@ void startModbus();
 void stopModbus();
 
 // --- FONCTION DE LECTURE PRINCIPALE ---
-void readAggregateBatteryMetrics(uint8_t configuredBatteryCount, AggregateBatteryMetrics *metrics);
 void updateIndividualBatteryMetrics(uint8_t batteryId);
 void updateBatteryStaticInfo(uint8_t batteryId);
 // --- FONCTIONS D'ÉCRITURE (pour l'appairage) ---

@@ -51,13 +51,6 @@ void monitorBatteryConnections();
  */
 int checkBatteryConnections();
 
-/**
- * @brief Met à jour l'état d'une batterie individuelle
- * @param batteryIndex Index de la batterie (0-based)
- * @param isResponding true si la batterie répond
- */
-void updateBatteryState(int batteryIndex, bool isResponding);
-
 // ——————— DIAGNOSTIC ET DÉTECTION DES PANNES ———————
 /**
  * @brief Vérifie l'état des MOSFETs de toutes les batteries
@@ -77,12 +70,6 @@ bool checkMosfetRecoveryConditions(int batteryIndex);
  * @return true si le mode dégradé doit être activé
  */
 bool checkDegradedModeConditions();
-
-/**
- * @brief Vérifie si le système peut sortir du mode dégradé
- * @return true si sortie possible
- */
-bool checkCanExitDegradedMode();
 
 // ——————— GESTION MODE DÉGRADÉ ———————
 /**
