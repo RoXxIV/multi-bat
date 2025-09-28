@@ -28,7 +28,18 @@ const long BATTERY_READ_INTERVAL = 250; // Intervalle de 250ms entre chaque lect
 // --- Structures de données globales ---
 AggregateBatteryMetrics latestMetrics;                         // Datas de toutes les batteries
 IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES]; // Datas individuelles de chaque batterie
-
+enum BatteryReadState
+{
+  STATE_IDLE,
+  STATE_READ_REALTIME,
+  STATE_WAIT,
+  STATE_READ_CONFIG_AND_VALIDATE,
+  STATE_PROCESS_DATA
+};
+BatteryReadState currentReadState = STATE_IDLE;
+unsigned long waitStartTime = 0;
+const long MODBUS_INTER_READ_DELAY = 100; // Délai de 100ms entre les lectures de blocs
+unsigned long lastCanSendTime = 0;
 // ——————— INITIALISATION SYSTÈME ———————
 void setup()
 {
@@ -112,18 +123,24 @@ void loop()
     updateMenuDisplay();
     lastDisplayUpdate = now;
   }
-
+  if (now - lastCanSendTime >= CAN_SEND_INTERVAL_MS) // CAN_SEND_INTERVAL_MS est déjà défini à 1000 dans CanBusManager.h
+  {
+    // On n'envoie les données que si elles sont valides pour éviter d'envoyer des valeurs par défaut
+    if (latestMetrics.isDataValid)
+    {
+      sendCanData();
+    }
+    lastCanSendTime = now;
+  }
   // --- LOGIQUE DE LECTURE ET D'ANALYSE ---
   // 1. Déclencheur : Toutes les 10 secondes, on LANCE une nouvelle séquence de lecture.
   if (now - lastMetricsUpdate >= METRICS_UPDATE_INTERVAL)
   {
-    // On ne lance une nouvelle séquence que si la précédente est bien terminée.
     if (!isReadingSequenceActive && configuredBatteryCount > 0)
     {
-      lastMetricsUpdate = now;                           // Réinitialiser le timer de 10 secondes
-      isReadingSequenceActive = true;                    // Lever le drapeau pour démarrer la séquence
-      batteryReadIndex = 0;                              // Commencer par la première batterie
-      lastBatteryReadTime = now - BATTERY_READ_INTERVAL; // Astuce pour lire la 1ère batterie immédiatement
+      lastMetricsUpdate = now;
+      isReadingSequenceActive = true;
+      batteryReadIndex = 0;
       Serial.println("\n>>> DÉCLENCHEMENT NOUVELLE SÉQUENCE DE LECTURE (toutes les 10s) <<<");
     }
   }
@@ -162,61 +179,74 @@ void handleButtonEvents()
 
 void handleBatteryReadSequence()
 {
-  // Si aucune séquence de lecture n'est active, on ne fait rien.
   if (!isReadingSequenceActive)
   {
+    if (currentReadState != STATE_IDLE)
+    {
+      currentReadState = STATE_IDLE;
+    }
     return;
   }
 
   unsigned long now = millis();
+  uint8_t currentBatteryId = batteryReadIndex + 2;
 
-  // Est-il temps de lire la prochaine batterie de la séquence ?
-  if (now - lastBatteryReadTime >= BATTERY_READ_INTERVAL)
+  if (currentReadState == STATE_IDLE)
   {
-    lastBatteryReadTime = now; // Réinitialiser le timer pour la prochaine
+    currentReadState = STATE_READ_REALTIME;
+  }
 
-    // --- Lecture d'UNE SEULE batterie ---
-    uint8_t currentBatteryId = batteryReadIndex + 2;
-    updateIndividualBatteryMetrics(currentBatteryId);
+  switch (currentReadState)
+  {
+  case STATE_READ_REALTIME:
+    updateBatteryMetrics_RealtimeData(currentBatteryId);
+    waitStartTime = now;
+    currentReadState = STATE_WAIT;
+    break;
 
-    // --- Vérifier l'etat de la batterie ---
-    bool responding = individualBatteryMetrics[batteryReadIndex + 1].isValid;
-    BatteryState *state = &batteryStates[batteryReadIndex]; // Pointeur vers l'état de la batterie actuelle
-    if (responding)
+  case STATE_WAIT:
+    if (now - waitStartTime >= MODBUS_INTER_READ_DELAY)
     {
-      state->isResponding = true;
-      state->lastResponseTime = millis();
-      state->status = BATTERY_OK; // Sera affiné plus tard par les autres vérifications
+      currentReadState = STATE_READ_CONFIG_AND_VALIDATE;
+    }
+    break;
+
+  case STATE_READ_CONFIG_AND_VALIDATE:
+    if (updateAndValidate_ConfigData(currentBatteryId))
+    {
+      batteryStates[batteryReadIndex].consecutiveFailures = 0;
     }
     else
     {
-      state->isResponding = false;
-      state->status = BATTERY_NOT_RESPONDING;
+      batteryStates[batteryReadIndex].consecutiveFailures++;
     }
+    currentReadState = STATE_PROCESS_DATA;
+    break;
 
-    printIndividualBatteryData(currentBatteryId); // Pour le debug
-
-    // On passe à la batterie suivante
+  case STATE_PROCESS_DATA:
+    printIndividualBatteryData(currentBatteryId);
     batteryReadIndex++;
 
-    // --- Avons-nous terminé de lire toutes les batteries ? ---
     if (batteryReadIndex >= configuredBatteryCount)
     {
-      // OUI : La séquence est terminée. On peut lancer l'analyse.
+      // Fin de la séquence
       Serial.println("\n=== SÉQUENCE DE LECTURE TERMINÉE - DÉBUT ANALYSE ===");
-
       updateSystemMetrics();
       checkDegradedModeConditions();
       runBatteryManagementCycle();
       printSystemStatus();
-      sendCanData();
-
-      // On baisse le drapeau pour signaler que la séquence est finie.
       isReadingSequenceActive = false;
+      currentReadState = STATE_IDLE;
     }
-    // La fonction se termine, et on attendra 250ms pour lire la suivante.
+    else
+    {
+      // Batterie suivante
+      currentReadState = STATE_READ_REALTIME;
+    }
+    break;
   }
 }
+
 // ==========================================================================
 // ================== FONCTION DE TEST MODBUS RAPIDE ========================
 // ==========================================================================

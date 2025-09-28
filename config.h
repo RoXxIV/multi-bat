@@ -31,9 +31,10 @@
 #define ADMIN_CODE_2 0 // deuxième chiffre
 #define ADMIN_CODE_3 0 // troisième chiffre
 // Paramètres temporels du système
-#define DEBOUNCE_DELAY 50       // Délai anti-rebond boutons (ms)
-#define MESSAGE_TIMEOUT 1500    // Durée affichage messages (ms)
-#define SCREEN_TIMEOUT_MS 60000 // Durée d'inactivité avant extinction écran (60s)
+#define DEBOUNCE_DELAY 50          // Délai anti-rebond boutons (ms)
+#define MESSAGE_TIMEOUT 1500       // Durée affichage messages (ms)
+#define SCREEN_TIMEOUT_MS 60000    // Durée d'inactivité avant extinction écran (60s)
+#define MAX_CONSECUTIVE_FAILURES 3 // NOUVELLE LIGNE : Nombre d'échecs de lecture avant déconnexion
 // Limites de l'interface utilisateur
 #define MAX_MENU_ITEMS 10    // Nombre maximum d'items de menu
 #define VISIBLE_MENU_ITEMS 4 // Items visibles simultanément
@@ -73,6 +74,9 @@
 // Timeouts et temporisations
 #define BATTERY_RESPONSE_TIMEOUT 5000        // Timeout réponse batterie (ms)
 #define MOSFET_RECOVERY_CHECK_INTERVAL 30000 // Intervalle vérification récupération MOSFET (ms)
+
+#define REG_RATED_CAPACITY_START 0x0109  // Adresse du premier des 2 registres pour la capacité nominale
+#define REG_ACTUAL_CAPACITY_START 0x010B // Adresse du premier des 2 registres pour la capacité réelle
 
 extern int configuredBatteryCount; // Nombre de batteries configurées par l'utilisateur
 
@@ -164,6 +168,7 @@ struct BatteryState
     bool isActive;                   // Batterie actuellement active dans le système
     float voltageDelta;              // Différence avec tension max du pack
     unsigned long lastMosfetCheck;   // Timestamp dernière vérification MOSFET
+    int consecutiveFailures;         // Nombre de fois ou la batterie a echoué
 };
 
 // Structure de diagnostic système global

@@ -14,6 +14,7 @@ struct IndividualBatteryData
     float voltage;
     float current;
     float soc;
+    float soh; // vvv
     uint16_t cellCount;
     float maxCellVoltage;        // en V
     float minCellVoltage;        // en V
@@ -55,7 +56,9 @@ void startModbus();
 void stopModbus();
 
 // --- FONCTION DE LECTURE PRINCIPALE ---
-void updateIndividualBatteryMetrics(uint8_t batteryId);
+void updateBatteryMetrics_RealtimeData(uint8_t batteryId); // Lit le gros bloc de données temps réel
+bool updateAndValidate_ConfigData(uint8_t batteryId);      // Lit le bloc config, valide les 2 lectures et décode tout
+
 void updateBatteryStaticInfo(uint8_t batteryId);
 // --- FONCTIONS D'ÉCRITURE (pour l'appairage) ---
 // Envoie commande d'affichage H=7 à une batterie spécifique

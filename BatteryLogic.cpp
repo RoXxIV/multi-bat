@@ -25,6 +25,7 @@ void initBatteryManagement()
         batteryStates[i].isActive = false;                 // vvv
         batteryStates[i].voltageDelta = 0.0f;              // delta de tension avec la batterie la plus chargé ?
         batteryStates[i].lastMosfetCheck = 0;
+        batteryStates[i].consecutiveFailures = 0;
     }
 
     // Initialisation du diagnostic système (parmi toutes les batteries)
@@ -235,9 +236,7 @@ void monitorBatteryConnections()
 
 int checkBatteryConnections()
 {
-
     extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
-
     unsigned long now = millis();
     int currentRespondingCount = 0;
     bool batteryLost = false;
@@ -246,48 +245,45 @@ int checkBatteryConnections()
 
     for (int i = 0; i < configuredBatteryCount; i++)
     {
-        int batteryId = i + 2; // ID commence à 2
+        int batteryId = i + 2;
         BatteryState *state = &batteryStates[i];
         IndividualBatteryData *data = &individualBatteryMetrics[i + 1];
 
-        // Vérifier si la batterie répond actuellement
         bool currentlyResponding = data->isValid;
 
         if (currentlyResponding)
         {
-            // Batterie répond - mettre à jour le timestamp
             if (!state->isResponding)
             {
                 Serial.printf("✅ BATTERIE ID=%d RECONNECTÉE\n", batteryId);
                 state->status = BATTERY_OK;
                 removeSystemError(ERROR_BATTERY_DISCONNECTED, batteryId);
             }
-
             state->isResponding = true;
             state->lastResponseTime = now;
+            state->consecutiveFailures = 0; // Réinitialiser en cas de succès
             currentRespondingCount++;
         }
         else
         {
-            // Batterie ne répond pas - vérifier le timeout
+            // Si la batterie était active, on vérifie si elle doit être déconnectée
             if (state->isResponding)
             {
-                // La batterie répondait avant, vérifier le timeout
-                if (now - state->lastResponseTime > BATTERY_RESPONSE_TIMEOUT)
+                // CONDITION DE DÉCONNEXION : Le timeout est dépassé ET le nombre d'échecs est atteint
+                if ((now - state->lastResponseTime > BATTERY_RESPONSE_TIMEOUT) && (state->consecutiveFailures >= MAX_CONSECUTIVE_FAILURES))
                 {
-                    Serial.printf("❌ BATTERIE ID=%d NON DÉTECTÉE (timeout: %lums)\n",
-                                  batteryId, now - state->lastResponseTime);
+                    Serial.printf("❌ BATTERIE ID=%d DÉCONNECTÉE (timeout ET %d échecs consécutifs)\n",
+                                  batteryId, state->consecutiveFailures);
 
                     state->isResponding = false;
                     state->status = BATTERY_NOT_RESPONDING;
-                    state->isActive = false; // Désactiver la batterie
+                    state->isActive = false;
                     batteryLost = true;
                     addSystemError(ERROR_BATTERY_DISCONNECTED, batteryId, "Batterie non detectee");
                 }
             }
             else
             {
-                // Batterie déjà marquée comme non répondante
                 if (state->status != BATTERY_NOT_RESPONDING)
                 {
                     state->status = BATTERY_NOT_RESPONDING;
@@ -295,37 +291,27 @@ int checkBatteryConnections()
                 }
             }
         }
-
-        Serial.printf("  ID=%d: %s (dernière réponse: %lums)\n",
+        Serial.printf("  ID=%d: %s (Échecs: %d, Dernière réponse: %lums ago)\n",
                       batteryId,
                       state->isResponding ? "RÉPOND" : "MUETTE",
-                      state->isResponding ? 0 : (now - state->lastResponseTime));
+                      state->consecutiveFailures,
+                      now - state->lastResponseTime);
     }
-
-    // Activer le mode dégradé si des batteries sont perdues
+    // ... le reste de la fonction est inchangé ...
     if (batteryLost && !degradedMode)
     {
         enableDegradedMode("Batterie(s) non détectée(s)");
     }
-
-    // Désactiver le mode dégradé si toutes les batteries sont revenues
     if (currentRespondingCount == configuredBatteryCount && degradedMode)
     {
-        // Vérifier si le mode dégradé était activé uniquement pour les connexions
         bool canDisableDegraded = true;
-
-        // Ici on pourrait ajouter d'autres vérifications (température, MOSFETs, etc.)
-        // Pour l'instant, on se contente des connexions
-
         if (canDisableDegraded)
         {
             disableDegradedMode();
         }
     }
-
     Serial.printf("RÉSULTAT: %d/%d batteries répondent\n",
                   currentRespondingCount, configuredBatteryCount);
-
     return currentRespondingCount;
 }
 

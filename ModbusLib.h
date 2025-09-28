@@ -16,8 +16,8 @@
 #define REG_TOTAL_VOLTAGE 0x38 // Tension totale de la batterie
 #define REG_CURRENT 0x39       // Courant charge/décharge
 #define REG_SOC 0x3A           // SOC
-// #define REG_HEARTBEAT 0x3B           // Heartbeat
-#define REG_CELL_COUNT 0x3C // Nombre de cellules
+#define REG_SOH 0x0118         // SOH vvv
+#define REG_CELL_COUNT 0x3C    // Nombre de cellules
 // #define REG_TEMP_SENSOR_COUNT 0x3D // Nombre de capteurs de température
 #define REG_MAX_CELL_VOLTAGE 0x3E // Tension max d'une cellule (mV)
 // #define REG_MAX_CELL_V_NUM 0x3F   // Numéro de la cellule avec la tension max

@@ -6,6 +6,13 @@ extern HardwareSerial modbusSerial; // pointeur qui contiendra le port serie à 
 uint8_t sendBuffer[256];            // Tableau pour construire les commandes Modbus à envoyer
 uint8_t receiveBuffer[256];         // Tableau pour stocker les réponses reçues des batteries
 
+// --- Nouveaux buffers simplifiés pour 2 lectures ---
+static uint8_t payload_realtime[((REG_FAULT_CODE_12_13 - REG_TOTAL_VOLTAGE) + 1) * 2];
+static uint8_t payload_config[4 * 2]; // Pour les 4 registres de capacité
+
+static int bytesRead_realtime;
+static int bytesRead_config;
+
 // ——————— FONCTIONS D'INITIALISATION ———————
 
 void initModbus()
@@ -40,83 +47,103 @@ void stopModbus()
     }
 }
 // ——————— FONCTIONS DE LECTURE ———————
+// ——————— NOUVELLES FONCTIONS DE LECTURE ———————
 
-void updateIndividualBatteryMetrics(uint8_t batteryId)
+// Lit un seul gros bloc pour toutes les données temps réel (regroupe vos anciens blocs 1, 2, 3)
+void updateBatteryMetrics_RealtimeData(uint8_t batteryId)
+{
+    const uint16_t startAddr = REG_TOTAL_VOLTAGE;
+    // On lit tout d'un coup de 0x38 (Total Voltage) à 0x73 (Fault Code 12-13)
+    const uint16_t regCount = (REG_FAULT_CODE_12_13 - REG_TOTAL_VOLTAGE) + 1;
+    bytesRead_realtime = modbus_read_registers(batteryId, startAddr, regCount, payload_realtime);
+}
+
+// Lit le bloc de configuration, valide les deux lectures et décode tout
+bool updateAndValidate_ConfigData(uint8_t batteryId)
 {
     IndividualBatteryData *batteryData = &individualBatteryMetrics[batteryId - 1];
     batteryData->isValid = false;
 
-    // --- LECTURE BLOC 1 (Données principales : 0x38 -> 0x45) ---
-    const uint16_t startAddr1 = REG_TOTAL_VOLTAGE;
-    const uint16_t regCount1 = (REG_MIN_CELL_TEMP - REG_TOTAL_VOLTAGE) + 1;
-    uint8_t payload1[regCount1 * 2];
-    int bytesRead1 = modbus_read_registers(batteryId, startAddr1, regCount1, payload1);
+    // Lit le bloc 2 (configuration pour le SOH)
+    const uint16_t startAddr_config = REG_RATED_CAPACITY_START;
+    const uint16_t regCount_config = 4;
+    bytesRead_config = modbus_read_registers(batteryId, startAddr_config, regCount_config, payload_config);
 
-    // --- LECTURE BLOC 2 (MOSFETs : 0x52 -> 0x53) ---
-    const uint16_t startAddr2 = REG_CHARGE_MOSFET;
-    const uint16_t regCount2 = 2;
-    uint8_t payload2[regCount2 * 2];
-    int bytesRead2 = modbus_read_registers(batteryId, startAddr2, regCount2, payload2);
-
-    // --- LECTURE BLOC 3 (Codes défaut : 0x6B -> 0x73) ---
-    const uint16_t startAddr3 = REG_WAKE_UP_SOURCE;
-    const uint16_t regCount3 = (REG_FAULT_CODE_12_13 - REG_WAKE_UP_SOURCE) + 1;
-    uint8_t payload3[regCount3 * 2];
-    int bytesRead3 = modbus_read_registers(batteryId, startAddr3, regCount3, payload3);
-
-    // --- DÉCODAGE ET VALIDATION ---
-    // Si une batterie repond correctement aux trois blocs, elle renvoie forcement le double de bits
-    if (bytesRead1 == (regCount1 * 2) && bytesRead2 == (regCount2 * 2) && bytesRead3 == (regCount3 * 2))
+    // Valide les deux lectures
+    const uint16_t expected_realtime_count = (REG_FAULT_CODE_12_13 - REG_TOTAL_VOLTAGE) + 1;
+    if (bytesRead_realtime == (expected_realtime_count * 2) && bytesRead_config == (regCount_config * 2))
     {
         int offset;
+        const uint16_t startAddr_realtime = REG_TOTAL_VOLTAGE;
 
-        // --- Décodage du BLOC 1 (Données principales) ---
-        offset = (REG_TOTAL_VOLTAGE - startAddr1) * 2;
-        batteryData->voltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 100.0f;
-        offset = (REG_CURRENT - startAddr1) * 2;
-        batteryData->current = (((int16_t)((payload1[offset] << 8) | payload1[offset + 1])) - 30000) * 0.1f;
-        offset = (REG_SOC - startAddr1) * 2;
-        batteryData->soc = ((payload1[offset] << 8) | payload1[offset + 1]) / 10.0f;
-        offset = (REG_CELL_COUNT - startAddr1) * 2;
-        batteryData->cellCount = (payload1[offset] << 8) | payload1[offset + 1];
-        offset = (REG_MAX_CELL_VOLTAGE - startAddr1) * 2;
-        batteryData->maxCellVoltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
-        offset = (REG_MIN_CELL_VOLTAGE - startAddr1) * 2;
-        batteryData->minCellVoltage = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
-        offset = (REG_CELL_V_DIFF - startAddr1) * 2;
-        batteryData->cellVoltageDifference = ((payload1[offset] << 8) | payload1[offset + 1]) / 1000.0f;
-        offset = (REG_MAX_CELL_TEMP - startAddr1) * 2;
-        batteryData->maxCellTemp = (((payload1[offset] << 8) | payload1[offset + 1])) - 40.0f;
-        offset = (REG_MIN_CELL_TEMP - startAddr1) * 2;
-        batteryData->minCellTemp = (((payload1[offset] << 8) | payload1[offset + 1])) - 40.0f;
+        // --- Décodage des données temps réel ---
+        offset = (REG_TOTAL_VOLTAGE - startAddr_realtime) * 2;
+        batteryData->voltage = ((payload_realtime[offset] << 8) | payload_realtime[offset + 1]) / 10.0f;
+        offset = (REG_CURRENT - startAddr_realtime) * 2;
+        batteryData->current = (((int16_t)((payload_realtime[offset] << 8) | payload_realtime[offset + 1])) - 30000) * 0.1f;
+        offset = (REG_SOC - startAddr_realtime) * 2;
+        batteryData->soc = ((payload_realtime[offset] << 8) | payload_realtime[offset + 1]) / 10.0f;
+        offset = (REG_CELL_COUNT - startAddr_realtime) * 2;
+        batteryData->cellCount = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_MAX_CELL_VOLTAGE - startAddr_realtime) * 2;
+        batteryData->maxCellVoltage = ((payload_realtime[offset] << 8) | payload_realtime[offset + 1]) / 1000.0f;
+        offset = (REG_MIN_CELL_VOLTAGE - startAddr_realtime) * 2;
+        batteryData->minCellVoltage = ((payload_realtime[offset] << 8) | payload_realtime[offset + 1]) / 1000.0f;
+        offset = (REG_CELL_V_DIFF - startAddr_realtime) * 2;
+        batteryData->cellVoltageDifference = ((payload_realtime[offset] << 8) | payload_realtime[offset + 1]) / 1000.0f;
+        offset = (REG_MAX_CELL_TEMP - startAddr_realtime) * 2;
+        batteryData->maxCellTemp = (((payload_realtime[offset] << 8) | payload_realtime[offset + 1])) - 40.0f;
+        offset = (REG_MIN_CELL_TEMP - startAddr_realtime) * 2;
+        batteryData->minCellTemp = (((payload_realtime[offset] << 8) | payload_realtime[offset + 1])) - 40.0f;
+        offset = (REG_CHARGE_MOSFET - startAddr_realtime) * 2;
+        batteryData->chargeMosfetStatus = (payload_realtime[offset + 1] & 0x01) != 0;
+        offset = (REG_DISCHARGE_MOSFET - startAddr_realtime) * 2;
+        batteryData->dischargeMosfetStatus = (payload_realtime[offset + 1] & 0x01) != 0;
+        offset = (REG_WAKE_UP_SOURCE - startAddr_realtime) * 2;
+        batteryData->wakeUpSource = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_0_1 - startAddr_realtime) * 2;
+        batteryData->faultCode0_1 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_2_3 - startAddr_realtime) * 2;
+        batteryData->faultCode2_3 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_4_5 - startAddr_realtime) * 2;
+        batteryData->faultCode4_5 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_6_7 - startAddr_realtime) * 2;
+        batteryData->faultCode6_7 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_8_9 - startAddr_realtime) * 2;
+        batteryData->faultCode8_9 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_10_11 - startAddr_realtime) * 2;
+        batteryData->faultCode10_11 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
+        offset = (REG_FAULT_CODE_12_13 - startAddr_realtime) * 2;
+        batteryData->faultCode12_13 = (payload_realtime[offset] << 8) | payload_realtime[offset + 1];
 
-        // --- Décodage du BLOC 2 (MOSFETs) ---
-        batteryData->chargeMosfetStatus = (payload2[1] & 0x01) != 0;
-        batteryData->dischargeMosfetStatus = (payload2[3] & 0x01) != 0;
+        // --- Décodage des capacités et CALCUL DU SOH ---
+        uint16_t rated_high = (payload_config[0] << 8) | payload_config[1];
+        uint16_t rated_low = (payload_config[2] << 8) | payload_config[3];
+        uint32_t rated_capacity_raw = ((uint32_t)rated_high << 16) | rated_low;
 
-        // --- Décodage du BLOC 3 (Codes défaut) ---
-        offset = (REG_WAKE_UP_SOURCE - startAddr3) * 2;
-        batteryData->wakeUpSource = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_0_1 - startAddr3) * 2;
-        batteryData->faultCode0_1 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_2_3 - startAddr3) * 2;
-        batteryData->faultCode2_3 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_4_5 - startAddr3) * 2;
-        batteryData->faultCode4_5 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_6_7 - startAddr3) * 2;
-        batteryData->faultCode6_7 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_8_9 - startAddr3) * 2;
-        batteryData->faultCode8_9 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_10_11 - startAddr3) * 2;
-        batteryData->faultCode10_11 = (payload3[offset] << 8) | payload3[offset + 1];
-        offset = (REG_FAULT_CODE_12_13 - startAddr3) * 2;
-        batteryData->faultCode12_13 = (payload3[offset] << 8) | payload3[offset + 1];
+        uint16_t actual_high = (payload_config[4] << 8) | payload_config[5];
+        uint16_t actual_low = (payload_config[6] << 8) | payload_config[7];
+        uint32_t actual_capacity_raw = ((uint32_t)actual_high << 16) | actual_low;
+
+        float rated_capacity = rated_capacity_raw / 1000.0f;
+        float actual_capacity = actual_capacity_raw / 1000.0f;
+
+        if (rated_capacity > 0)
+        {
+            batteryData->soh = (actual_capacity / rated_capacity) * 100.0f;
+        }
+        else
+        {
+            batteryData->soh = 0;
+        }
 
         batteryData->isValid = true;
+        return true;
     }
     else
     {
-        Serial.printf("ERREUR: Échec lecture des blocs de données pour ID=%d (B1:%d, B2:%d, B3:%d)\n", batteryId, bytesRead1, bytesRead2, bytesRead3);
+        Serial.printf("ERREUR: Échec lecture des blocs pour ID=%d (Temps Réel:%d, Config:%d)\n", batteryId, bytesRead_realtime, bytesRead_config);
+        return false;
     }
 }
 
