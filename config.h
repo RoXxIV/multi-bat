@@ -11,7 +11,7 @@
 
 // Pins des LEDs d'état
 #define LED_RED_PIN 26    // LED rouge alarme
-#define LED_YELLOW_PIN 27 // LED jaune
+#define LED_YELLOW_PIN 27 // LED jaune à definir
 
 // Configuration boutons de navigation
 #define BTN_UP_PIN 39   // Bouton haut
@@ -33,7 +33,7 @@
 // Paramètres temporels du système
 #define DEBOUNCE_DELAY 50          // Délai anti-rebond boutons (ms)
 #define MESSAGE_TIMEOUT 1500       // Durée affichage messages (ms)
-#define SCREEN_TIMEOUT_MS 60000    // Durée d'inactivité avant extinction écran (60s)
+#define SCREEN_TIMEOUT_MS 300000   // Durée d'inactivité avant extinction écran (5min)
 #define MAX_CONSECUTIVE_FAILURES 3 // NOUVELLE LIGNE : Nombre d'échecs de lecture avant déconnexion
 // Limites de l'interface utilisateur
 #define MAX_MENU_ITEMS 10    // Nombre maximum d'items de menu
@@ -84,104 +84,100 @@ extern int configuredBatteryCount; // Nombre de batteries configurées par l'uti
 // Types de boutons du système
 enum ButtonType
 {
-    BTN_UP = 0,   // Index bouton navigation haut
-    BTN_DOWN = 1, // Index bouton navigation bas
-    BTN_OK = 2,   // Index bouton validation
-    BTN_BACK = 3, // Index bouton retour
-    BTN_COUNT = 4 // Nombre total de boutons
+  BTN_UP = 0,   // Index bouton navigation haut
+  BTN_DOWN = 1, // Index bouton navigation bas
+  BTN_OK = 2,   // Index bouton validation
+  BTN_BACK = 3, // Index bouton retour
+  BTN_COUNT = 4 // Nombre total de boutons
 };
 // Types d'écrans de l'interface
 enum ScreenType
 {
-    SCREEN_MAIN_DATA = 0,      // Écran principal avec données batteries
-    SCREEN_MENU = 1,           // Écran de menu principal
-    SCREEN_CODE_INPUT = 2,     // Écran de saisie code admin
-    SCREEN_CODE_RESULT = 3,    // Écran de résultat validation code
-    SCREEN_CAN_FRAMES = 4,     // Écran d'affichage trames CAN
-    SCREEN_BRIGHTNESS = 5,     // Écran de réglage de luminosité
-    SCREEN_BATTERY_LIST = 6,   // Nouvel écran: liste des batteries
-    SCREEN_BATTERY_DETAIL = 7, // Nouvel écran: détails d'une batterie
-    SCREEN_ERROR_LIST = 8,     // Écran des erreurs système
-    SCREEN_OTA = 9,            // mise à jour OTA
-    SCREEN_DIAGNOSTIC = 10,    // Diagnostic
+  SCREEN_MAIN_DATA = 0,      // Écran principal avec données batteries
+  SCREEN_MENU = 1,           // Écran de menu principal
+  SCREEN_CODE_INPUT = 2,     // Écran de saisie code admin
+  SCREEN_CODE_RESULT = 3,    // Écran de résultat validation code
+  SCREEN_BRIGHTNESS = 4,     // Écran de réglage de luminosité
+  SCREEN_BATTERY_LIST = 5,   // Nouvel écran: liste des batteries
+  SCREEN_BATTERY_DETAIL = 6, // Nouvel écran: détails d'une batterie
+  SCREEN_ERROR_LIST = 7,     // Écran des erreurs système
+  SCREEN_OTA = 8,            // mise à jour OTA
+  SCREEN_VERSION = 9,        // Version du firmware
 };
 // Actions disponibles dans les menus
 enum MenuActions
 {
-    ACTION_DISPLAY_IDS = 1,     // Afficher IDs des batteries
-    ACTION_ERRORS = 2,          // Afficher erreurs système
-    ACTION_INDIVIDUAL = 3,      // Données batteries individuelles
-    ACTION_ADMIN_CODE = 4,      // Saisie code administrateur
-    ACTION_PAIRING = 5,         // Processus d'appairage batteries
-    ACTION_SYSTEM_SETTINGS = 6, // Paramètres système (admin)
-    ACTION_CAN_FRAMES = 7,      // Affichage trames CAN temps réel
-    ACTION_BRIGHTNESS = 8,      // Action pour régler la luminosité
-    ACTION_OTA_UPDATE = 9,      // Mise à jour OTA
-    ACTION_DIAGNOSTIC = 10      // Diagnostic
+  ACTION_DISPLAY_IDS = 1,     // Afficher IDs des batteries
+  ACTION_ERRORS = 2,          // Afficher erreurs système
+  ACTION_INDIVIDUAL = 3,      // Données batteries individuelles
+  ACTION_ADMIN_CODE = 4,      // Saisie code administrateur
+  ACTION_PAIRING = 5,         // Processus d'appairage batteries
+  ACTION_SYSTEM_SETTINGS = 6, // Paramètres système (admin)
+  ACTION_BRIGHTNESS = 7,      // Action pour régler la luminosité
+  ACTION_OTA_UPDATE = 8,      // Mise à jour OTA
+  ACTION_VERSION = 9          // Afficher la version
 };
 
 enum LimitationType
 {
-    NO_LIMITATION = 0,           // Aucune limitation
-    MOSFET_LIMITATION = 1,       // Limitation due aux MOSFETs
-    VOLTAGE_LIMITATION = 2,      // Limitation due aux tensions
-    TEMP_LIMITATION = 3,         // Limitation due aux températures
-    DEGRADED_MODE_LIMITATION = 4 // Limitation mode dégradé
+  NO_LIMITATION = 0,           // Aucune limitation
+  MOSFET_LIMITATION = 1,       // Limitation due aux MOSFETs
+  VOLTAGE_LIMITATION = 2,      // Limitation due aux tensions
+  TEMP_LIMITATION = 3,         // Limitation due aux températures
+  DEGRADED_MODE_LIMITATION = 4 // Limitation mode dégradé
 };
 
 enum BatteryStatus
 {
-    BATTERY_OK = 0,             // Batterie fonctionnelle
-    BATTERY_NOT_RESPONDING = 1, // Batterie ne répond pas
-    BATTERY_MOSFET_ISSUE = 2,   // Problème MOSFET
-    BATTERY_TEMP_ISSUE = 3,     // Problème température
-    BATTERY_VOLTAGE_ISSUE = 4,  // Problème tension
-    BATTERY_CELL_IMBALANCE = 5, // Déséquilibre cellules
-    BATTERY_BMS_FAULT = 6       // Erreur interne du BMS
+  BATTERY_OK = 0,             // Batterie fonctionnelle
+  BATTERY_NOT_RESPONDING = 1, // Batterie ne répond pas
+  BATTERY_MOSFET_ISSUE = 2,   // Problème MOSFET
+  BATTERY_TEMP_ISSUE = 3,     // Problème température
+  BATTERY_VOLTAGE_ISSUE = 4,  // Problème tension
+  BATTERY_CELL_IMBALANCE = 5, // Déséquilibre cellules
+  BATTERY_BMS_FAULT = 6       // Erreur interne du BMS
 };
 
 // ——————— STRUCTURES DE DONNÉES ———————
 // Structure d'état d'un bouton physique
 struct ButtonState
 {
-    int pin;                    // Numéro de pin GPIO
-    bool currentState;          // État actuel filtré
-    bool previousState;         // État précédent (pour détection front)
-    unsigned long lastDebounce; // Timestamp dernier changement
+  int pin;                    // Numéro de pin GPIO
+  bool currentState;          // État actuel filtré
+  bool previousState;         // État précédent (pour détection front)
+  unsigned long lastDebounce; // Timestamp dernier changement
 };
 // Structure d'un item de menu
 struct MenuItem
 {
-    const char *text; // Texte affiché dans le menu
-    int action;       // Action à exécuter (enum MenuActions)
-    bool isAdminOnly; // Visible uniquement en mode admin
+  const char *text; // Texte affiché dans le menu
+  int action;       // Action à exécuter (enum MenuActions)
+  bool isAdminOnly; // Visible uniquement en mode admin
 };
 
 // ——————— STRUCTURES POUR LA GESTION DES BATTERIES ———————
 // Structure d'état d'une batterie individuelle
 struct BatteryState
 {
-    bool isResponding;               // Batterie répond aux commandes Modbus
-    unsigned long lastResponseTime;  // Timestamp dernière réponse valide
-    BatteryStatus status;            // État actuel de la batterie
-    LimitationType activeLimitation; // Type de limitation active
-    bool isActive;                   // Batterie actuellement active dans le système
-    float voltageDelta;              // Différence avec tension max du pack
-    unsigned long lastMosfetCheck;   // Timestamp dernière vérification MOSFET
-    int consecutiveFailures;         // Nombre de fois ou la batterie a echoué
+  bool isResponding;               // Batterie répond aux commandes Modbus
+  unsigned long lastResponseTime;  // Timestamp dernière réponse valide
+  BatteryStatus status;            // État actuel de la batterie
+  LimitationType activeLimitation; // Type de limitation active
+  unsigned long lastMosfetCheck;   // Timestamp dernière vérification MOSFET
+  int consecutiveFailures;         // Nombre de fois ou la batterie a echoué
 };
 
 // Structure de diagnostic système global
 struct SystemDiagnostics
 {
-    bool degradedMode;            // Mode dégradé actif
-    int activeBatteryCount;       // Nombre de batteries actives
-    int respondingBatteryCount;   // Nombre de batteries qui répondent
-    float maxBatteryVoltage;      // Tension max parmi toutes les batteries
-    float minBatteryVoltage;      // Tension min parmi toutes les batteries
-    float maxBatteryTemp;         // Température max parmi toutes les batteries
-    float minBatteryTemp;         // Température min parmi toutes les batteries
-    unsigned long lastDiagnostic; // Timestamp dernier diagnostic
+  bool degradedMode;            // Mode dégradé actif
+  int activeBatteryCount;       // Nombre de batteries actives
+  int respondingBatteryCount;   // Nombre de batteries qui répondent
+  float maxBatteryVoltage;      // Tension max parmi toutes les batteries
+  float minBatteryVoltage;      // Tension min parmi toutes les batteries
+  float maxBatteryTemp;         // Température max parmi toutes les batteries
+  float minBatteryTemp;         // Température min parmi toutes les batteries
+  unsigned long lastDiagnostic; // Timestamp dernier diagnostic
 };
 
 // ——————— STRUCTURES POUR LA GESTION DES ERREURS ———————
@@ -189,35 +185,35 @@ struct SystemDiagnostics
 // Types d'erreurs système
 enum ErrorType
 {
-    ERROR_BATTERY_DISCONNECTED = 1,
-    ERROR_MOSFET_CHARGE = 2,
-    ERROR_MOSFET_DISCHARGE = 3,
-    ERROR_CELL_IMBALANCE = 4,
-    ERROR_OVERTEMPERATURE = 5,
-    ERROR_UNDERTEMPERATURE = 6,
-    ERROR_OVERVOLTAGE = 7,
-    ERROR_UNDERVOLTAGE = 8,
-    ERROR_CAN_BUS = 9,
-    ERROR_WAKEUP_BUTTON_OFF = 10,
-    ERROR_MOSFET_OVERTEMPERATURE = 11,
-    ERROR_SHORT_CIRCUIT = 12,
-    ERROR_OVERCURRENT_CHARGE = 13,
-    ERROR_OVERCURRENT_DISCHARGE = 14,
-    ERROR_CHARGE_PROHIBITED = 15,
-    ERROR_DISCHARGE_PROHIBITED = 16,
-    ERROR_BMS_INTERNAL_FAULT = 17
+  ERROR_BATTERY_DISCONNECTED = 1,
+  ERROR_MOSFET_CHARGE = 2,
+  ERROR_MOSFET_DISCHARGE = 3,
+  ERROR_CELL_IMBALANCE = 4,
+  ERROR_OVERTEMPERATURE = 5,
+  ERROR_UNDERTEMPERATURE = 6,
+  ERROR_OVERVOLTAGE = 7,
+  ERROR_UNDERVOLTAGE = 8,
+  ERROR_CAN_BUS = 9,
+  ERROR_WAKEUP_BUTTON_OFF = 10,
+  ERROR_MOSFET_OVERTEMPERATURE = 11,
+  ERROR_SHORT_CIRCUIT = 12,
+  ERROR_OVERCURRENT_CHARGE = 13,
+  ERROR_OVERCURRENT_DISCHARGE = 14,
+  ERROR_CHARGE_PROHIBITED = 15,
+  ERROR_DISCHARGE_PROHIBITED = 16,
+  ERROR_BMS_INTERNAL_FAULT = 17
 };
 
 // Structure d'une erreur
 struct SystemError
 {
-    bool active;                 // Erreur active ou non
-    ErrorType type;              // Type d'erreur
-    int batteryId;               // ID batterie concernée (-1 si système global)
-    unsigned long firstOccurred; // Timestamp première occurrence
-    unsigned long lastOccurred;  // Timestamp dernière occurrence
-    int occurrenceCount;         // Nombre d'occurrences
-    char description[50];        // Description courte
+  bool active;                 // Erreur active ou non
+  ErrorType type;              // Type d'erreur
+  int batteryId;               // ID batterie concernée (-1 si système global)
+  unsigned long firstOccurred; // Timestamp première occurrence
+  unsigned long lastOccurred;  // Timestamp dernière occurrence
+  int occurrenceCount;         // Nombre d'occurrences
+  char description[50];        // Description courte
 };
 
 #define MAX_SYSTEM_ERRORS 20 // Nombre maximum d'erreurs stockées

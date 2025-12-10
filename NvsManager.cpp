@@ -9,22 +9,17 @@ const char *NVS_KEY_BAT_COUNT = "bat_count";
 
 void initNvs()
 {
-    // Initialise la NVS. Doit être appelé une seule fois dans setup().
-    preferences.begin("multi-bat", false);
-    Serial.println("NVS initialisée.");
+  preferences.begin("multi-bat", false);
 }
 
 void saveBatteryCount(int count)
 {
-    // Ouvre la NVS et écrit la valeur 'count' sous la clé "bat_count".
-    // On utilise putUChar car le nombre de batteries (0-9) tient sur un octet non signé.
-    preferences.putUChar(NVS_KEY_BAT_COUNT, (uint8_t)count);
-    Serial.printf("NVS: Nombre de batteries (%d) sauvegardé.\n", count);
+  // Ouvre la NVS et écrit la valeur 'count' sous la clé "bat_count".
+  preferences.putUChar(NVS_KEY_BAT_COUNT, (uint8_t)count);
 }
 
 int loadBatteryCount()
 {
-    // Lit la valeur associée à la clé "bat_count".
-    // Le second argument (0) est la valeur par défaut à retourner si la clé n'existe pas.
-    return (int)preferences.getUChar(NVS_KEY_BAT_COUNT, 0);
+  // Le second argument (0) est la valeur par défaut à retourner si la clé n'existe pas.
+  return (int)preferences.getUChar(NVS_KEY_BAT_COUNT, 0);
 }

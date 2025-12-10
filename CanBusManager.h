@@ -37,8 +37,6 @@
 // ——————— VARIABLES GLOBALES ———————
 extern CanFrame canFrame;         // Structure de trame CAN pour envoi
 extern unsigned long lastCanSend; // Timestamp du dernier envoi CAN
-extern char lastCanFrames[5][50]; // Stockage texte des trames pour affichage
-extern bool canDisplayActive;     // État affichage temps réel des trames
 
 // ——————— FONCTIONS D'INITIALISATION ———————
 
@@ -87,24 +85,10 @@ void sendAlarms();
  */
 void sendRequests();
 
-// ——————— AFFICHAGE TEMPS RÉEL DES TRAMES ———————
-
 /**
- * @brief Met à jour le texte d'affichage des trames
- * Actualise les valeurs hexadécimales selon les données actuelles
+ * @brief Envoie une trame 0x351 de limites de charge/décharge à 0A.
+ * Utilisé au démarrage comme mesure de sécurité.
  */
-void updateCanFrameDisplay();
-
-/**
- * @brief Affiche l'écran des trames CAN en temps réel
- * Montre les 5 trames + indicateurs d'état système
- */
-void showCanFrames();
-
-/**
- * @brief Active/désactive l'affichage temps réel des trames
- * @param active true pour activer, false pour désactiver
- */
-void setCanDisplayActive(bool active);
+void sendSafeLimitsZero();
 
 #endif

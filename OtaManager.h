@@ -17,7 +17,6 @@ bool startOTAServer();   // Démarre le serveur OTA
 void stopOTAServer();    // Arrête le serveur OTA
 bool connectToWiFi();    // Se connecte au WiFi
 void handleOTAProcess(); // Gère le processus OTA (à appeler dans loop)
-String getWiFiStatus();  // Retourne le statut WiFi
 String getOTAInfo();     // Retourne les infos OTA (IP, nom, etc.)
 
 #endif

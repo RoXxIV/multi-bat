@@ -10,8 +10,8 @@
 // Choix disponibles après configuration d'une batterie
 enum PairingChoice
 {
-    CHOICE_ADD_BATTERY,
-    CHOICE_FINISH
+  CHOICE_ADD_BATTERY,
+  CHOICE_FINISH
 };
 
 // ——————— VARIABLES GLOBALES ———————
@@ -38,13 +38,11 @@ extern bool codeSuccess;          // Indicateur si le code est correct
 // ——————— FONCTIONS D'INITIALISATION ———————
 void initMenu();  // Initialise le système de menu au démarrage
 void buildMenu(); // Construit la liste des items selon le mode (user/admin)
-
 // ——————— FONCTIONS DE NAVIGATION ———————
 void navigateMenuUp();   // Déplace la sélection vers le haut (bouton UP)
 void navigateMenuDown(); // Déplace la sélection vers le bas (bouton DOWN)
 void selectMenuItem();   // Exécuter l'action de l'item de menu actuellement sélectionné
 void goBackMenu();       // Retour vers le menu principal
-
 // ——————— FONCTIONS D'AFFICHAGE ———————
 // Affichage principal
 void updateMenuDisplay(); // Met à jour l'affichage selon l'écran courant (appelée dans loop)
@@ -55,15 +53,16 @@ void showCodeResultScreen();    // Affiche le résultat de validation du code ad
 void showBrightnessScreen();    // Affiche l'écran de choix de luminosité
 void showBatteryListScreen();   // Affiche la liste des batteries configurées
 void showBatteryDetailScreen(); // Affiche les détails de la batterie sélectionnée
-void showDiagnosticScreen();    // Affiche l'écran de diagnostic
+void showOTAScreen();           // Affiche l'écran OTA
+void showVersionScreen();       // Affiche l'écran de version
+void showErrorScreen();         // Affiche l'écran des erreurs
 // ——————— GESTION MODE ADMIN ———————
-void activateAdminMode();   // Active le mode admin (ajoute items avancés au menu)
-void deactivateAdminMode(); // Désactive le mode admin (retour mode utilisateur)
-bool isAdminMode();         // Retourne l'état du mode admin
+void updateAllBatteryDisplays(uint8_t asciiValue); // Envoie la commande d'affichage de l'ID à toutes les batteries configurées
+void activateAdminMode();                          // Active le mode admin (ajoute items avancés au menu)
+void deactivateAdminMode();                        // Désactive le mode admin (retour mode utilisateur)
 // Gestion du code admin
 void resetCodeInput(); // Remet à zéro la saisie du code admin
 void checkAdminCode(); // Vérifie si le code saisi est correct et gère l'activation du mode admin
-
 // ——————— APPAIRAGE DES BATTERIES ———————
 void actionPairing();                              // Lance le processus complet d'appairage des batteries
 void sequentialPairingWithMenu();                  // Gère l'appairage séquentiel avec menus de choix
@@ -73,17 +72,11 @@ PairingChoice showPairingMenu(int batteriesCount); // Affiche le menu de choix a
 PairingChoice showErrorMenu();                     // Affiche le menu en cas d'erreur de configuration
 // Affiche un message et attend confirmation OK de l'utilisateur
 void waitForUserConfirmation(const char *title, const char *line1, const char *line2 = nullptr, const char *line3 = nullptr);
-
 // ——————— FONCTIONS UTILITAIRES ———————
 void adjustMenuView();                 // Ajuste la fenêtre de visualisation du menu (scroll automatique)
 void executeMenuAction(int itemIndex); // Exécute l'action associée à un item de menu
-
-/**
- * @brief Affiche l'écran des erreurs système
- */
-void showErrorScreen();
-
 // ——————— Mise a jour OTA ———————
-void actionOTAUpdate(); // Lance le processus OTA
-void showOTAScreen();   // Affiche l'écran OTA
+void actionOTAUpdate();       // Lance le processus OTA
+void handleAutoErrorScreen(); // Vérifie les nouvelles erreurs et force l'affichage
+
 #endif

@@ -9,44 +9,39 @@
 // ——————— DONNÉES DES BATTERIES ———————
 struct IndividualBatteryData
 {
-    bool isValid;
-    char serialNumber[33];
-    float voltage;
-    float current;
-    float soc;
-    float soh; // vvv
-    uint16_t cellCount;
-    float maxCellVoltage;        // en V
-    float minCellVoltage;        // en V
-    float cellVoltageDifference; // en V
-    float maxCellTemp;           // en °C
-    float minCellTemp;           // en °C
-
-    bool chargeMosfetStatus;
-    bool dischargeMosfetStatus;
-
-    uint16_t wakeUpSource;
-    uint16_t faultCode0_1;
-    uint16_t faultCode2_3;
-    uint16_t faultCode4_5;
-    uint16_t faultCode6_7;
-    uint16_t faultCode8_9;
-    uint16_t faultCode10_11;
-    uint16_t faultCode12_13;
+  bool isValid;
+  char serialNumber[33];
+  float voltage;
+  float current;
+  float soc;
+  float soh; // valeur fixee a 100%
+  float ratedCapacity;
+  float chargeCurrentLimitL1;
+  float dischargeCurrentLimitL1;
+  uint16_t cellCount;
+  float maxCellVoltage;        // en V
+  float minCellVoltage;        // en V
+  float cellVoltageDifference; // en V
+  float maxCellTemp;           // en °C
+  float minCellTemp;           // en °C
+  bool chargeMosfetStatus;
+  bool dischargeMosfetStatus;
+  uint16_t wakeUpSource;
+  uint16_t faultCode0_1;
+  uint16_t faultCode2_3;
+  uint16_t overVoltL2Threshold_mV;  // Seuil de Surtension L2 (lu depuis 0x0132)
+  uint16_t underVoltL2Threshold_mV; // Seuil de Sous-tension L2 (lu depuis 0x0136)
 };
-// Structure pour stocker les données consolidées de l'ensemble du parc de batteries.
 struct AggregateBatteryMetrics
 {
-    float averageSoc;     // SOC moyen de toutes les batteries
-    float averageVoltage; // Tension moyenne
-    float totalCurrent;   // Courant total (somme des courants)
-    float averageTemp;    // Température moyenne des MOSFETs
-    bool isDataValid;     // Indique si les données sont fiables
+  float averageSoc;     // SOC moyen de toutes les batteries
+  float averageVoltage; // Tension moyenne
+  float totalCurrent;   // Courant total (somme des courants)
+  float averageTemp;    // Température moyenne des MOSFETs
+  bool isDataValid;     // Indique si les données sont fiables
 };
 extern IndividualBatteryData individualBatteryMetrics[MAX_BATTERIES];
-
 // ——————— CONSTANTES MODBUS ———————
-// Paramètres de communication
 #define BAUD_RATE 9600   // Vitesse de communication série
 #define MASTER_ADDR 0x81 // Adresse de l'ESP32 en tant que maître
 
@@ -55,21 +50,21 @@ void initModbus();
 void startModbus();
 void stopModbus();
 
-// --- FONCTION DE LECTURE PRINCIPALE ---
-void updateBatteryMetrics_RealtimeData(uint8_t batteryId); // Lit le gros bloc de données temps réel
-bool updateAndValidate_ConfigData(uint8_t batteryId);      // Lit le bloc config, valide les 2 lectures et décode tout
+// --- NOUVELLE FONCTION DE LECTURE PAS-À-PAS ---
+/**
+ * @brief Lit la prochaine valeur Modbus pour une batterie donnée, selon l'étape (readStep).
+ * @param batteryId L'ID de la batterie (ex: 2, 3...).
+ * @param readStep L'étape de lecture (0 à 13). Cette variable est incrémentée par la fonction si la lecture réussit.
+ * @return true si la lecture a réussi, false en cas d'échec (timeout/CRC).
+ */
+bool processNextModbusRead(uint8_t batteryId, int &readStep);
 
+// --- LECTURE INFOS STATIQUES ---
 void updateBatteryStaticInfo(uint8_t batteryId);
-// --- FONCTIONS D'ÉCRITURE (pour l'appairage) ---
-// Envoie commande d'affichage H=7 à une batterie spécifique
-bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue);
-// Change l'ID d'une batterie vers ID=1 (utilisé avant appairage)
-bool changeBatteryIdTo1(uint8_t batteryId);
-// Change l'ID de toutes les batteries vers 1 (reset complet)
-bool changeAllBatteriesToId1();
-// Change l'ID d'une batterie de 1 vers un nouvel ID (appairage)
-bool changeBatteryIdFrom1To(uint8_t newId);
 
-// --- FONCTIONS UTILITAIRES MODBUS ---
-void printIndividualBatteryData(uint8_t batteryId);
+// --- FONCTIONS D'ÉCRITURE (pour l'appairage) ---
+bool sendDisplayIdToBattery(uint8_t batteryId, uint8_t asciiValue);
+bool changeBatteryIdTo1(uint8_t batteryId);
+bool changeAllBatteriesToId1();
+bool changeBatteryIdFrom1To(uint8_t newId);
 #endif

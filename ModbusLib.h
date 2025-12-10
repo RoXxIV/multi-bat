@@ -13,11 +13,11 @@
 #define CMD_WRITE_MULTIPLE 0x10 // Écriture de registres multiples
 
 // Registres de données temps réel spécifiques
-#define REG_TOTAL_VOLTAGE 0x38 // Tension totale de la batterie
-#define REG_CURRENT 0x39       // Courant charge/décharge
-#define REG_SOC 0x3A           // SOC
-#define REG_SOH 0x0118         // SOH vvv
-#define REG_CELL_COUNT 0x3C    // Nombre de cellules
+#define REG_TOTAL_VOLTAGE 0x38  // Tension totale de la batterie
+#define REG_CURRENT 0x39        // Courant charge/décharge
+#define REG_SOC 0x3A            // SOC
+#define REG_LIMITS_START 0x0140 // Début du bloc des limites de courant (0x0140 à 0x0145)
+#define REG_CELL_COUNT 0x3C     // Nombre de cellules
 // #define REG_TEMP_SENSOR_COUNT 0x3D // Nombre de capteurs de température
 #define REG_MAX_CELL_VOLTAGE 0x3E // Tension max d'une cellule (mV)
 // #define REG_MAX_CELL_V_NUM 0x3F   // Numéro de la cellule avec la tension max
@@ -34,18 +34,19 @@
 #define REG_SERIAL_NUMBER_START 0x018D // Début du numéro de série
 #define REG_SERIAL_NUMBER_COUNT 14     // Nombre de registres pour le S/N
 
-#define REG_WAKE_UP_SOURCE 0x6B   // Source du réveil
-#define REG_FAULT_CODE_0_1 0x6D   // Nouveaux codes défaut 0-1
-#define REG_FAULT_CODE_2_3 0x6E   // Nouveaux codes défaut 2-3
-#define REG_FAULT_CODE_4_5 0x6F   // Nouveaux codes défaut 4-5
-#define REG_FAULT_CODE_6_7 0x70   // Nouveaux codes défaut 6-7
-#define REG_FAULT_CODE_8_9 0x71   // Nouveaux codes défaut 8-9
-#define REG_FAULT_CODE_10_11 0x72 // Nouveaux codes défaut 10-11
-#define REG_FAULT_CODE_12_13 0x73 // Nouveaux codes défaut 12-13
+#define REG_WAKE_UP_SOURCE 0x6B // Source du réveil
+
+extern uint16_t faultCode0_1; // Pour 0x006D (Fault 0 et 1)
+extern uint16_t faultCode2_3; // Pour 0x006E (Fault 2 et 3)
 
 // Commandes d'affichage sur LCD batterie
 #define DISPLAY_ID_CMD 7 // Commande pour afficher ID
 #define ASCII_7 0x37     // Valeur ASCII pour "7"
+#define ASCII_4 0x34     // Valeur ASCII pour "4"
+
+// Pointeur de fonction pour le callback d'inactivité
+typedef void (*LoopCallback)();
+void modbus_set_idle_callback(LoopCallback callback);
 
 // ——————— FONCTIONS DE LA BIBLIOTHÈQUE MODBUS ———————
 
@@ -71,14 +72,6 @@ void modbus_enable_receive();
  * @return La longueur de la trame construite (toujours 8).
  */
 int modbus_build_read_frame(uint8_t *buffer, uint8_t slave_id, uint16_t start_addr, uint16_t reg_count);
-
-/**
- * @brief Affiche le contenu d'un buffer en hexadécimal pour le débogage.
- * @param label Un texte à afficher avant le buffer.
- * @param buffer Le buffer à afficher.
- * @param length La longueur du buffer.
- */
-void modbus_print_buffer(const char *label, uint8_t *buffer, int length);
 
 /**
  * @brief Calcule le CRC16 Modbus d'un buffer de données.
