@@ -341,15 +341,15 @@ float calculateChargeSetpoint()
   }
   if (!globalChargeMosfetOk)
   {
-    Serial.println("SÉCURITÉ: MOSFET Charge OFF détecté. Consigne de charge globale = 0A.");
+    // Serial.println("SÉCURITÉ: MOSFET Charge OFF détecté. Consigne de charge globale = 0A.");
     return 0.0f; // Un MOSFET de charge est OFF
   }
 
   // Si le nombre de batteries qui répondent est inférieur au nombre configuré, on arrête tout.
   if (respondingBatteryCount < configuredBatteryCount)
   {
-    Serial.printf("SECURITE: Perte de com (%d/%d batteries). Consigne de charge = 0A.\n",
-                  respondingBatteryCount, configuredBatteryCount);
+    /* Serial.printf("SECURITE: Perte de com (%d/%d batteries). Consigne de charge = 0A.\n",
+                  respondingBatteryCount, configuredBatteryCount);*/
     return 0.0f;
   }
 
@@ -399,8 +399,8 @@ float calculateChargeSetpoint()
       if (data->maxCellVoltage >= threshold_V)
       {
         limitRequired = true;
-        Serial.printf("CHARGE LIMIT: Surtension L2 MANUELLE (%.3fV >= %.3fV) (Batt ID %d)\n",
-                      data->maxCellVoltage, threshold_V, batteryId);
+        /* Serial.printf("CHARGE LIMIT: Surtension L2 MANUELLE (%.3fV >= %.3fV) (Batt ID %d)\n",
+                      data->maxCellVoltage, threshold_V, batteryId);*/
         break; // Une alarme /10 suffit, on sort de la boucle
       }
     }
@@ -410,7 +410,7 @@ float calculateChargeSetpoint()
     if (fault_0 & 0b00001000)
     {
       limitRequired = true;
-      Serial.printf("CHARGE LIMIT: Alarme Sous-tension L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("CHARGE LIMIT: Alarme Sous-tension L1 (Batt ID %d)\n", batteryId);
       break;
     }
     // Alarme 3: Charging high temperature Level-1 (0x6D High, bit 3)
@@ -418,7 +418,7 @@ float calculateChargeSetpoint()
     if (fault_1 & 0b00001000)
     {
       limitRequired = true;
-      Serial.printf("CHARGE LIMIT: Alarme Temp Charge Haute L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("CHARGE LIMIT: Alarme Temp Charge Haute L1 (Batt ID %d)\n", batteryId);
       break;
     }
     // Alarme 4: Charging low temperature Level-1 (0x6E Low, bit 0)
@@ -426,15 +426,15 @@ float calculateChargeSetpoint()
     if (fault_2 & 0b00000001)
     {
       limitRequired = true;
-      Serial.printf("CHARGE LIMIT: Alarme Temp Charge Basse L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("CHARGE LIMIT: Alarme Temp Charge Basse L1 (Batt ID %d)\n", batteryId);
       break;
     }
   }
   // --- Appliquer les règles ---
   if (limitRequired)
   {
-    Serial.println("CHARGE LIMIT: Une alarme BMS (Rated/10) est active.");
-    // Appliquer la consigne limitée pour l'ensemble du parc
+    // Serial.println("CHARGE LIMIT: Une alarme BMS (Rated/10) est active.");
+    //  Appliquer la consigne limitée pour l'ensemble du parc
     return limitedSetpoint * respondingBatteryCount;
   }
   // Si aucune alarme n'est atteinte (NIVEAU PLEINE CAPACITÉ)
@@ -450,15 +450,15 @@ float calculateDischargeSetpoint()
   }
   if (!globalDischargeMosfetOk)
   {
-    Serial.println("SÉCURITÉ: MOSFET Décharge OFF détecté. Consigne de décharge globale = 0A.");
+    // Serial.println("SÉCURITÉ: MOSFET Décharge OFF détecté. Consigne de décharge globale = 0A.");
     return 0.0f; // Un MOSFET de décharge est OFF
   }
 
   // Si le nombre de batteries qui répondent est inférieur au nombre configuré, on arrête tout.
   if (respondingBatteryCount < configuredBatteryCount)
   {
-    Serial.printf("SECURITE: Perte de com (%d/%d batteries). Consigne de décharge = 0A.\n",
-                  respondingBatteryCount, configuredBatteryCount);
+    /*Serial.printf("SECURITE: Perte de com (%d/%d batteries). Consigne de décharge = 0A.\n",
+                  respondingBatteryCount, configuredBatteryCount);*/
     return 0.0f;
   }
 
@@ -503,7 +503,7 @@ float calculateDischargeSetpoint()
     if (fault_0 & 0b00100000)
     {
       stopRequired = true;
-      Serial.printf("DECHARGE STOP: Alarme Sous-tension L3 (Batt ID %d)\n", batteryId);
+      // Serial.printf("DECHARGE STOP: Alarme Sous-tension L3 (Batt ID %d)\n", batteryId);
       break; // STOP prioritaire, on sort de la boucle
     }
     // --- NIVEAU LIMITÉ (vérifié seulement si pas de STOP) ---
@@ -512,7 +512,7 @@ float calculateDischargeSetpoint()
     if (fault_0 & 0b00001000)
     {
       limitRequired = true;
-      Serial.printf("DECHARGE LIMIT: Alarme Sous-tension L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("DECHARGE LIMIT: Alarme Sous-tension L1 (Batt ID %d)\n", batteryId);
     }
 
     // Alarme 3: Discharging high temperature Level-1 (0x6E Low, bit 3)
@@ -520,7 +520,7 @@ float calculateDischargeSetpoint()
     if (fault_2 & 0b00001000)
     {
       limitRequired = true;
-      Serial.printf("DECHARGE LIMIT: Alarme Temp Décharge Haute L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("DECHARGE LIMIT: Alarme Temp Décharge Haute L1 (Batt ID %d)\n", batteryId);
     }
 
     // Alarme 4: Discharging low temperature Level-1 (0x6E High, bit 0)
@@ -528,7 +528,7 @@ float calculateDischargeSetpoint()
     if (fault_3 & 0b00000001)
     {
       limitRequired = true;
-      Serial.printf("DECHARGE LIMIT: Alarme Temp Décharge Basse L1 (Batt ID %d)\n", batteryId);
+      // Serial.printf("DECHARGE LIMIT: Alarme Temp Décharge Basse L1 (Batt ID %d)\n", batteryId);
     }
   }
 
@@ -537,14 +537,14 @@ float calculateDischargeSetpoint()
   // NIVEAU STOP (Prioritaire)
   if (stopRequired)
   {
-    Serial.println("DECHARGE STOP: Une alarme BMS de niveau 3 (Sous-tension) est active.");
+    // Serial.println("DECHARGE STOP: Une alarme BMS de niveau 3 (Sous-tension) est active.");
     return 0.0f; // Arrêt complet
   }
   // NIVEAU LIMITÉ
   if (limitRequired)
   {
-    Serial.println("DECHARGE LIMIT: Une alarme BMS de niveau 1 ou 2 est active.");
-    // Appliquer la consigne limitée pour l'ensemble du parc
+    // Serial.println("DECHARGE LIMIT: Une alarme BMS de niveau 1 ou 2 est active.");
+    //  Appliquer la consigne limitée pour l'ensemble du parc
     return limitedSetpoint * respondingBatteryCount;
   }
   // Si aucune règle n'est atteinte (NIVEAU PLEINE CAPACITÉ)

@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <U8g2lib.h>
+#include <esp_task_wdt.h>
 #include "Config.h"
 #include "DisplayManager.h"
 #include "MenuManager.h"
@@ -9,11 +10,13 @@
 #include "NvsManager.h"
 #include "BatteryLogic.h"
 #include "OtaManager.h"
+#include "SlaveManager.h"
 
 // ——————— Objets materiels ———————
 HardwareSerial modbusSerial(2);
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, OLED_SCL_PIN, OLED_SDA_PIN, OLED_RESET);
-
+// ------- Watchdog -------
+#define WDT_TIMEOUT 30
 // ——————— Variable de timing  ———————
 unsigned long lastDisplayUpdate = 0;
 #define DISPLAY_UPDATE_INTERVAL 500
@@ -59,7 +62,7 @@ void setup()
 
   // Initialisation Modbus RS485 CAN
   initModbus();
-
+  initSlaveModbus(); // Initialise le port esclave sur GPIO 1 / 3
   // Reset affichage ID (MODBUS)
   if (configuredBatteryCount > 0)
   {
@@ -115,11 +118,20 @@ void setup()
 
   showMessage("BIENVENUE", "Demarrage");
   delay(1500);
+
+  // ——————— INITIALISATION WATCHDOG ———————
+  // 1. Initialise avec un timeout de 30s et 'true' pour reset automatique
+  esp_task_wdt_init(WDT_TIMEOUT, true);
+  // 2. Ajoute la tâche courante (le thread principal Arduino) au watchdog
+  esp_task_wdt_add(NULL);
 }
 
 // ——————— BOUCLE PRINCIPALE ———————
 void loop()
 {
+  // ——————— RESET WATCHDOG  ———————
+  esp_task_wdt_reset();
+
   unsigned long now = millis();
 
   updateButtons();         // GESTION DES BOUTONS
@@ -140,6 +152,8 @@ void loop()
 
   handleBatteryReadSequence(); // LOGIQUE DE LECTURE, ANALYSE ET ENVOI CAN
   monitorBatteryConnections(); // SURVEILLANCE DES CONNEXIONS
+
+  handleSlaveModbus(); // Vérifie et répond aux requêtes du boitier monabee
 }
 
 void handleButtonEvents()

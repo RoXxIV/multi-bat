@@ -25,6 +25,17 @@
 #define MODBUS_DE_RE_PIN 18   // Pin control direction RS485
 #define MODBUS_SERIAL Serial2 // Port série utilisé pour Modbus
 
+// ——————— CONFIGURATION PORT ESCLAVE (BOITIER Monabee) ———————
+// Remplace le port Serial standard (USB)
+#define SLAVE_RX_PIN 3  // RX0
+#define SLAVE_TX_PIN 1  // TX0
+#define SLAVE_DE_PIN 13 // Driver Enable
+#define SLAVE_RE_PIN 14 // Receiver Enable
+#define SLAVE_ID 0x81   // L'ID auquel l'ESP32 doit répondre
+
+// Désactiver les logs série car le port est pris
+#define DISABLE_LOGGING
+
 // ——————— CONFIGURATION SYSTÈME ———————
 // Code d'accès admin (3 chiffres)
 #define ADMIN_CODE_1 0 // premier chiffre

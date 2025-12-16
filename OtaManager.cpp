@@ -21,7 +21,7 @@ const char *OTA_PASSWORD = "update_pro";    // Authentification OTA renforcée
 
 void initOTA()
 {
-  Serial.println("Système OTA Point d'Accès initialisé");
+  // Serial.println("Système OTA Point d'Accès initialisé");
 }
 
 bool connectToWiFi()
