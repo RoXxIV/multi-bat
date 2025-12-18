@@ -185,6 +185,7 @@ void processBatteriesGlobalState()
   turnedOffBatteryId = 0;
   // Accumulateurs pour les moyennes
   float minSoc = 101.0f;
+  float totalSoc = 0.0f;
   float totalVoltage = 0.0f;
   // On utilise un entier 32 bits pour cumuler les valeurs avec offset (30000)
   int32_t totalCurrentRawSum = 0;
@@ -275,6 +276,7 @@ void processBatteriesGlobalState()
     }
     // ---LOGIQUE MOYENNES & AGRÉGATION ---
     validBatteries++;
+    totalSoc += data->soc;
     // On retient le SOC le plus faible du parc
     if (data->soc < minSoc)
       minSoc = data->soc;
@@ -293,7 +295,7 @@ void processBatteriesGlobalState()
   respondingBatteryCount = validBatteries;
   if (validBatteries > 0)
   {
-    latestMetrics.averageSoc = minSoc;                            // SOC Min
+    latestMetrics.averageSoc = totalSoc / validBatteries;         // SOC Moyen
     latestMetrics.averageVoltage = totalVoltage / validBatteries; // Moyenne Tensions
     // --- CALCUL FINAL DU COURANT ---
     // Formule : TotalBrut - (30000 * NombreDeBatteries)

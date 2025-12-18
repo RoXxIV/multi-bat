@@ -1,6 +1,7 @@
 #include "MenuManager.h"
 #include "ButtonManager.h"
 #include "NvsManager.h"
+#include "BatteryLogic.h"
 
 // ——————— VARIABLES GLOBALES ———————
 int currentScreen = SCREEN_MAIN_DATA;
@@ -929,6 +930,15 @@ void finalizePairing(int batteriesConfigured)
     delay(2000);
   }
   saveBatteryCount(batteriesConfigured);
+
+  // 1. Mettre à jour la variable globale en RAM immédiatement
+  extern int configuredBatteryCount; // Rappel explicite (déjà dans config.h mais sûr)
+  configuredBatteryCount = batteriesConfigured;
+
+  // 2. Réinitialiser la logique batterie (états, erreurs, timeouts)
+  // Cela évite que le système considère les batteries comme "perdues"
+  // à cause du temps passé dans le menu.
+  initBatteryManagement();
 }
 // Menu après configuration réussie
 PairingChoice showPairingMenu(int batteriesCount)
